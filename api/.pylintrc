@@ -1,0 +1,4 @@
+[MESSAGES CONTROL]
+# R0801: duplicate-code — ORM model and Pydantic schema definitions legitimately
+# share boilerplate column/field declarations; this is not extractable duplication.
+disable=duplicate-code

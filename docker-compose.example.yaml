@@ -1,0 +1,162 @@
+# BrewGraph OSS — self-hosted single-user deployment
+# Usage: docker compose up -d
+
+services:
+
+  brewgraph-web:
+    image: mpse2/brewgraph-web
+    container_name: brewgraph-web
+    restart: unless-stopped
+    environment:
+      - API_HOST=brewgraph-api
+      # Required: never fall back to a known browser/API credential.
+      - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
+    ports:
+      - "80:80"
+      # Uncomment when HTTPS is enabled below — without it, HTTPS is enabled
+      # inside the container but unreachable from outside it.
+      # - "443:443"
+    networks:
+      - brewgraph-net
+    depends_on:
+      - brewgraph-api
+      - brewgraph-display
+    # volumes:
+    #   # Optional: mount SSL certs for HTTPS (see README.md's HTTPS section for
+    #   # required filenames). Leave empty for HTTP-only.
+    #   - ./web/certs:/etc/nginx/ssl:ro
+
+  brewgraph-api:
+    image: mpse2/brewgraph-api
+    container_name: brewgraph-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting BrewGraph}@brewgraph-db:5432/brewgraph
+      # Required: must match the web and sidecar credentials.
+      - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
+      - API_KEY_ENABLED=true
+      - SCHEDULER_ENABLED=true
+      - CACHE_ENABLED=true
+      - REDIS_HOST=brewgraph-redis
+      - TRUST_PROXY_HEADERS=true  # Safe here because nginx sets X-Real-IP from $remote_addr
+      - BREWFATHER_USER_KEY=${BREWFATHER_USER_KEY:-}
+      - BREWFATHER_API_KEY=${BREWFATHER_API_KEY:-}
+      # - BREWERS_FRIEND_USER_KEY=${BREWERS_FRIEND_USER_KEY:-} # Future integration not yet implemented
+      # - BREWERS_FRIEND_API_KEY=${BREWERS_FRIEND_API_KEY:-} # Future integration not yet implemented
+    volumes:
+      - brewgraph-data:/data
+      - brewgraph-logs:/app/log
+    ports:
+      # brewgraph-mdns and brewgraph-ble reach the API through the web
+      # container's Nginx proxy on port 80 (API_HOST=${WEBSERVER_IP}:80),
+      # not through this port — they don't need it published.
+      #
+      # This binding is for local development/debugging only: it's the raw,
+      # unproxied API (no nginx, no TLS, and TRUST_PROXY_HEADERS=true below
+      # means it trusts X-Real-IP from whoever connects). Bound to loopback
+      # only so a human on the host itself can reach it directly without
+      # exposing it to the rest of the LAN, where it would let any host
+      # bypass nginx and the API key screen entirely, and spoof headers
+      # nginx would otherwise set safely.
+      - "127.0.0.1:8080:80"
+    networks:
+      - brewgraph-net
+    depends_on:
+      - brewgraph-redis
+      - brewgraph-db
+
+  brewgraph-display:
+    image: mpse2/brewgraph-display
+    container_name: brewgraph-display
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - brewgraph-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  brewgraph-redis:
+    image: redis:7-alpine
+    container_name: brewgraph-redis
+    restart: unless-stopped
+    networks:
+      - brewgraph-net
+    volumes:
+      - brewgraph-redis-data:/data
+
+  brewgraph-db:
+    image: postgres:17-alpine
+    container_name: brewgraph-db
+    hostname: brewgraph-db
+    restart: always
+    networks:
+      - brewgraph-net
+    volumes:
+      - brewgraph-db-data:/var/lib/postgresql/data/pgdata
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_SERVER=brewgraph-db
+      - POSTGRES_USER=postgres
+      # IMPORTANT: Change this password before deploying.
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting BrewGraph}
+      - POSTGRES_DB=brewgraph
+
+  brewgraph-log:
+    image: mpse2/brewgraph-log
+    container_name: brewgraph-log
+    restart: unless-stopped
+    environment:
+      - API_HOST=brewgraph-api
+      - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
+      - REDIS_HOST=brewgraph-redis
+      - MAX_FILE_SIZE=100000
+    networks:
+      - brewgraph-net
+    volumes:
+      - brewgraph-logs:/app/log
+    depends_on:
+      - brewgraph-api
+      - brewgraph-redis
+
+  brewgraph-mdns:
+    image: mpse2/brewgraph-mdns
+    container_name: brewgraph-mdns
+    restart: unless-stopped
+    network_mode: host  # required for mDNS/multicast to reach the LAN
+    environment:
+      # network_mode:host — must be your host's own LAN IP, not localhost
+      - API_HOST=${WEBSERVER_IP:?Set WEBSERVER_IP (your host's LAN IP) in .env before starting BrewGraph}:80
+      - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
+    depends_on:
+      - brewgraph-api
+
+  brewgraph-ble: # Will not work on non-Linux hosts due to host-mode networking and BLE access requirements.
+    image: mpse2/brewgraph-ble
+    container_name: brewgraph-ble
+    restart: unless-stopped
+    network_mode: host          # required for BLE host access
+    environment:
+      # network_mode:host — must be your host's own LAN IP, not localhost
+      - API_HOST=${WEBSERVER_IP:?Set WEBSERVER_IP (your host's LAN IP) in .env before starting BrewGraph}:80
+      - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
+      - MIN_INTERVAL=900
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - /var/run/dbus:/var/run/dbus  # BlueZ D-Bus socket
+    depends_on:
+      - brewgraph-api
+
+networks:
+  brewgraph-net:
+
+volumes:
+  brewgraph-data:       # Export files
+  brewgraph-db-data:    # PostgreSQL data volume
+  brewgraph-redis-data: # Redis persistence
+  brewgraph-logs:       # Device serial logs (log collector sidecar)

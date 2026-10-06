@@ -1,0 +1,16 @@
+# Python temporary files
+.pytest_cache/
+__pycache__/
+*.egg-info/
+.coverage
+htmlcov/
+graphify-out/
+
+# Temporary files
+.DS_Store
+.vscode/
+.venv/
+*.sqlite
+.env
+.env.*
+docker-compose.yaml

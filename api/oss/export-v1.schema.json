@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brewgraph.com/schemas/brewgraph-batch-export-v1.json",
+  "title": "brewgraph-batch-export-v1",
+  "description": "The single definition of the export/backup/archive document. Several programs produce this format, in this repo and in tools built on it -- web/src/modules/backup/exportDocument.ts is the one here. Each producer used to pin the key set in its own test, so all of them could agree with themselves while disagreeing with each other; the camelCase regression survived exactly that way, and one producer omitted `mode` entirely until 2026-08-19. This file is the definition every producer validates against. Edit it here.",
+
+  "type": "object",
+  "unevaluatedProperties": false,
+  "required": [
+    "schemaVersion",
+    "exportedAt",
+    "source",
+    "mode",
+    "settings",
+    "devices",
+    "taps",
+    "vessels",
+    "batches"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "exportedAt": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 },
+    "sourceInstanceId": {
+      "type": "string",
+      "description": "Opaque, stable source installation identity; emitted only by backup-mode OSS exports."
+    },
+    "mode": {
+      "enum": ["ml", "archive", "backup"],
+      "description": "Depth is not inferable from content -- an `ml` export of a batch with no notes is byte-identical to its `archive`. Restore refuses anything that is not `backup`."
+    },
+    "settings": { "type": "object" },
+    "taps": { "type": "array" },
+    "vessels": { "type": "array" },
+    "devices": { "type": "array" },
+    "batches": { "type": "array" }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "backup" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "devices": { "items": { "$ref": "#/$defs/deviceBackup" } },
+          "batches": { "items": { "$ref": "#/$defs/batchBackup" } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "archive" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "devices": { "items": { "$ref": "#/$defs/deviceMl" } },
+          "batches": { "items": { "$ref": "#/$defs/batchArchive" } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "ml" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "devices": { "items": { "$ref": "#/$defs/deviceMl" } },
+          "batches": { "items": { "$ref": "#/$defs/batchMl" } }
+        }
+      }
+    }
+  ],
+
+  "$defs": {
+    "nullableNumber": { "type": ["number", "null"] },
+    "nullableString": { "type": ["string", "null"] },
+
+    "readingBase": {
+      "type": "object",
+      "required": [
+        "deviceChipId",
+        "temperature",
+        "battery",
+        "rssi",
+        "runTime",
+        "excluded",
+        "isAggregate",
+        "createdAt"
+      ],
+      "properties": {
+        "deviceChipId": { "$ref": "#/$defs/nullableString" },
+        "temperature": { "$ref": "#/$defs/nullableNumber" },
+        "battery": { "$ref": "#/$defs/nullableNumber" },
+        "rssi": { "$ref": "#/$defs/nullableNumber" },
+        "runTime": { "$ref": "#/$defs/nullableNumber" },
+        "excluded": { "type": "boolean" },
+        "isAggregate": { "type": "boolean" },
+        "createdAt": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+
+    "gravityReading": {
+      "description": "Every non-internal column of GravityReading. The archive is lossless against the reading tables, so adding a column to the model is incomplete until it appears here.",
+      "$ref": "#/$defs/readingBase",
+      "unevaluatedProperties": false,
+      "required": ["gravity", "angle", "velocity"],
+      "properties": {
+        "gravity": { "$ref": "#/$defs/nullableNumber" },
+        "angle": { "$ref": "#/$defs/nullableNumber" },
+        "velocity": { "$ref": "#/$defs/nullableNumber" }
+      }
+    },
+
+    "pressureReading": {
+      "$ref": "#/$defs/readingBase",
+      "unevaluatedProperties": false,
+      "required": ["pressure"],
+      "properties": { "pressure": { "$ref": "#/$defs/nullableNumber" } }
+    },
+
+    "temperatureReading": {
+      "description": "Every non-internal column of TempReading. Unlike gravity/pressure it carries no `runTime` or `angle`/`velocity` -- those sensors don't measure them -- but does carry `tempType` (beer vs chamber probe), which gravity/pressure readings have no equivalent of.",
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "deviceChipId",
+        "temperature",
+        "tempType",
+        "battery",
+        "rssi",
+        "excluded",
+        "isAggregate",
+        "createdAt"
+      ],
+      "properties": {
+        "deviceChipId": { "$ref": "#/$defs/nullableString" },
+        "temperature": { "$ref": "#/$defs/nullableNumber" },
+        "tempType": { "$ref": "#/$defs/nullableString" },
+        "battery": { "$ref": "#/$defs/nullableNumber" },
+        "rssi": { "$ref": "#/$defs/nullableNumber" },
+        "excluded": { "type": "boolean" },
+        "isAggregate": { "type": "boolean" },
+        "createdAt": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+
+    "device": {
+      "type": "object",
+      "description": "Base shape, extended by depth. Deliberately does NOT set `unevaluatedProperties` -- a base that closes itself rejects the fields its own extensions add, because it only ever evaluates its own `properties`. The closing happens in the leaf definitions below. `token` is backup-only: it identifies a device to a batch or tap, and a training export has no use for it.",
+      "required": ["chipId", "name", "role", "board", "gyroModel", "deviceFiltered"],
+      "properties": {
+        "chipId": { "$ref": "#/$defs/nullableString" },
+        "name": { "$ref": "#/$defs/nullableString" },
+        "role": { "type": "string" },
+        "board": { "$ref": "#/$defs/nullableString" },
+        "gyroModel": { "$ref": "#/$defs/nullableString" },
+        "deviceFiltered": { "type": "boolean" }
+      }
+    },
+
+    "deviceBackup": {
+      "$ref": "#/$defs/device",
+      "unevaluatedProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nullableString" },
+        "deviceType": { "$ref": "#/$defs/nullableString" },
+        "mdns": { "$ref": "#/$defs/nullableString" },
+        "url": { "$ref": "#/$defs/nullableString" },
+        "config": { "$ref": "#/$defs/nullableString" },
+        "token": { "$ref": "#/$defs/nullableString" },
+        "deviceColor": { "$ref": "#/$defs/nullableString" },
+        "collectLogs": { "type": ["boolean", "null"] },
+        "description": { "$ref": "#/$defs/nullableString" },
+        "batchId": { "$ref": "#/$defs/nullableString" },
+        "vesselId": { "$ref": "#/$defs/nullableString" },
+        "batchRole": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+
+    "batchBase": {
+      "type": "object",
+      "required": [
+        "name",
+        "brewDate",
+        "style",
+        "og",
+        "fg",
+        "abv",
+        "volume",
+        "yeast",
+        "yeastProductId",
+        "notes",
+        "recipeCost",
+        "costCurrency",
+        "fermentation",
+        "gravityReadings",
+        "pressureReadings",
+        "temperatureReadings",
+        "fermentationSteps",
+        "dryHops"
+      ],
+      "properties": {
+        "name": { "$ref": "#/$defs/nullableString" },
+        "brewDate": { "$ref": "#/$defs/nullableString" },
+        "style": { "$ref": "#/$defs/nullableString" },
+        "og": { "$ref": "#/$defs/nullableNumber" },
+        "fg": { "$ref": "#/$defs/nullableNumber" },
+        "abv": { "$ref": "#/$defs/nullableNumber" },
+        "volume": { "$ref": "#/$defs/nullableNumber" },
+        "yeast": { "$ref": "#/$defs/nullableString" },
+        "yeastProductId": { "$ref": "#/$defs/nullableString" },
+        "notes": { "$ref": "#/$defs/nullableString" },
+        "recipeCost": { "$ref": "#/$defs/nullableNumber" },
+        "costCurrency": { "$ref": "#/$defs/nullableString" },
+        "fermentation": { "type": ["object", "null"] },
+        "gravityReadings": { "type": "array", "items": { "$ref": "#/$defs/gravityReading" } },
+        "pressureReadings": { "type": "array", "items": { "$ref": "#/$defs/pressureReading" } },
+        "temperatureReadings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/temperatureReading" }
+        },
+        "fermentationSteps": { "type": "array" },
+        "dryHops": { "type": "array" },
+        "truth": { "$ref": "#/$defs/truth" }
+      }
+    },
+
+    "deviceMl": {
+      "$ref": "#/$defs/device",
+      "unevaluatedProperties": false
+    },
+
+    "batchMl": {
+      "$ref": "#/$defs/batchBase",
+      "unevaluatedProperties": false
+    },
+
+    "batchArchiveBase": {
+      "description": "Open, so `batchBackup` can extend it. See the note on `device`.",
+      "$ref": "#/$defs/batchBase",
+      "required": ["batchNotes"],
+      "properties": {
+        "batchNotes": { "type": "array", "items": { "$ref": "#/$defs/batchNote" } }
+      }
+    },
+
+    "batchNote": {
+      "description": "One BatchNote row. Carries exactly the fields a restore can write back via BatchNoteCreate -- `id`/`batchId`/`updatedAt` are deliberately absent, because a restore recreates the batch under a new id. `testResult` holds a diacetyl-test outcome, so it is a decision the brewer made rather than an annotation.",
+      "type": "object",
+      "required": ["content", "createdAt", "noteType", "testResult"],
+      "properties": {
+        "content": { "type": "string" },
+        "createdAt": { "$ref": "#/$defs/nullableString" },
+        "noteType": { "$ref": "#/$defs/nullableString" },
+        "testResult": { "$ref": "#/$defs/nullableString" }
+      },
+      "unevaluatedProperties": false
+    },
+
+    "batchArchive": {
+      "$ref": "#/$defs/batchArchiveBase",
+      "unevaluatedProperties": false
+    },
+
+    "batchBackup": {
+      "$ref": "#/$defs/batchArchiveBase",
+      "unevaluatedProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/nullableString" },
+        "description": { "$ref": "#/$defs/nullableString" },
+        "acceptIngest": { "type": ["boolean", "null"] },
+        "brewer": { "$ref": "#/$defs/nullableString" },
+        "ebc": { "$ref": "#/$defs/nullableNumber" },
+        "ibu": { "$ref": "#/$defs/nullableNumber" },
+        "carbonationVolumes": { "$ref": "#/$defs/nullableNumber" },
+        "brewfatherBatchId": { "$ref": "#/$defs/nullableString" },
+        "fermentationChamber": { "$ref": "#/$defs/nullableString" },
+        "packageDate": { "$ref": "#/$defs/nullableString" },
+        "conditioningDays": { "$ref": "#/$defs/nullableNumber" },
+        "status": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+
+    "truth": {
+      "description": "A hand-authored completion label. Permitted on a batch entry in a stored training file, but NO PRODUCER MAY EVER WRITE ONE -- the rule is about the producer, not the field, and a schema cannot express it. Asserted separately by each suite. `completion_time` is an instant; a duration is not stored, because the start it was measured from was never recorded consistently.",
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["completion_time"],
+      "properties": {
+        "completion_time": { "type": "string", "minLength": 1 },
+        "completion_time_derived": { "type": "object" },
+        "criteria": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

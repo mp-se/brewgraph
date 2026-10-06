@@ -1,0 +1,20 @@
+/*
+ * Display theme override — empty by default.
+ *
+ * Loaded after the built-in styles, so anything here wins. Replace this file in
+ * a deployment (bind mount over /usr/share/nginx/html/theme.css, or COPY it in a
+ * derived image) to brand the display without rebuilding the app.
+ *
+ * The built-in styles are driven by custom properties on .public-display; see
+ * src/styles.css for the full list. For example:
+ *
+ * .public-display {
+ *   --display-primary: #6f42c1;
+ *   --display-font: 'Inter', sans-serif;
+ *   --display-radius: 12px;
+ * }
+ * .theme-dark {
+ *   --display-bg: #121212;
+ *   --display-card: #1e1e1e;
+ * }
+ */

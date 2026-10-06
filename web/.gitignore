@@ -1,0 +1,10 @@
+dist/
+node_modules/
+.vite/
+coverage/
+test-results/
+test-results-parity/
+
+# Precompiled JSON-schema validators (scripts/build-validators.mjs).
+# Regenerated on every dev/build/test run; never edited by hand.
+src/modules/backup/generated/

@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brewgraph.com/schemas/brewlogger-import.json",
+  "title": "BrewLogger export (import source)",
+  "description": "The shape BrewLogger writes, as consumed by web/src/modules/backup/brewloggerRestore.ts and by any other importer of BrewLogger data. This is a format we do NOT control, so the schema is deliberately permissive: it types what BrewLogger is known to write and rejects wrong types, but allows unknown keys so a future BrewLogger version is not refused outright. Derived from the BrewLogger source (src/modules/classes/*.js and src/views/BackupView.vue) plus a survey of 7 real exports totalling 5344 readings, 2026-08-19.",
+
+  "$comment": "Two rules make this format looser than it looks, and both are load-bearing. (1) BackupView.cleanupJson() deletes every key whose value is null before writing, so almost nothing is guaranteed present -- a schema with broad `required` would reject valid exports. (2) Exports taken by other paths keep their nulls, so the same field is variously absent or null across real files. Every optional field therefore permits both. Verified against the corpus: chamberTemperature, beerTemperature and predictionAtTimestamp arrive as explicit nulls.",
+
+  "anyOf": [
+    { "$ref": "#/$defs/singleBatch" },
+    { "$ref": "#/$defs/backup" }
+  ],
+
+  "$defs": {
+    "backup": {
+      "title": "A whole-database backup",
+      "description": "Written by BackupView.createBackup(). `meta.version` is BrewLogger's own: 0.5 is the older form, 0.8 added pressure and pour.",
+      "type": "object",
+      "required": ["batches"],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "properties": {
+            "version": { "type": "string" },
+            "software": { "type": "string" },
+            "created": { "type": "string" }
+          }
+        },
+        "batches": { "type": "array", "items": { "$ref": "#/$defs/batch" } },
+        "devices": { "type": "array" },
+        "pressure": { "type": "array" },
+        "pour": { "type": "array" }
+      }
+    },
+
+    "singleBatch": {
+      "title": "One batch, exported on its own",
+      "description": "The batch object at the top level rather than inside `batches`. This is the shape a per-batch export takes, and the one every archived sample export on hand uses.",
+      "$ref": "#/$defs/batch"
+    },
+
+    "batch": {
+      "type": "object",
+      "description": "Unknown keys are permitted: BrewLogger may add fields, and downstream tooling writes its own annotations onto preserved originals (board, gyro, device_filtered, yeast, yeastProductId, truth). `name` and `gravity` are required because the converter cannot do anything without them -- everything else it either maps or ignores.",
+      "required": ["name", "gravity"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "chipIdGravity": { "type": ["string", "null"] },
+        "chipIdPressure": { "type": ["string", "null"] },
+        "active": { "type": ["boolean", "null"] },
+        "tapList": { "type": ["boolean", "null"] },
+        "brewDate": { "type": ["string", "null"] },
+        "style": { "type": ["string", "null"] },
+        "brewer": { "type": ["string", "null"] },
+        "abv": { "type": ["number", "null"] },
+        "ebc": { "type": ["number", "null"] },
+        "ibu": { "type": ["number", "null"] },
+        "fg": { "type": ["number", "null"] },
+        "og": { "type": ["number", "null"] },
+        "brewfatherId": { "type": ["string", "null"] },
+        "fermentationChamber": { "type": ["integer", "null"] },
+        "fermentationSteps": {
+          "description": "A JSON-encoded STRING in every real export, not an array -- BrewLogger stores the serialised form. An array is accepted too, since Batch.toJson() suggests one and a future version may emit it.",
+          "type": ["string", "array", "null"]
+        },
+        "predictionHoursLeft": { "type": ["number", "null"] },
+        "predictionAtTimestamp": { "type": ["string", "null"] },
+        "id": { "type": ["integer", "null"] },
+        "gravity": { "type": "array", "items": { "$ref": "#/$defs/gravityReading" } },
+        "pressure": { "type": "array", "items": { "$ref": "#/$defs/pressureReading" } },
+        "pour": { "type": "array", "items": { "$ref": "#/$defs/pourEvent" } }
+      }
+    },
+
+    "gravityReading": {
+      "type": "object",
+      "description": "Fields match Gravity.js. `created` is required because a reading with no timestamp cannot be placed in a series, which is the one thing every consumer needs.",
+      "required": ["created"],
+      "properties": {
+        "temperature": { "type": ["number", "null"] },
+        "gravity": { "type": ["number", "null"] },
+        "velocity": { "type": ["number", "null"] },
+        "angle": { "type": ["number", "null"] },
+        "battery": { "type": ["number", "null"] },
+        "rssi": { "type": ["number", "null"] },
+        "corrGravity": {
+          "description": "BrewLogger's temperature-corrected gravity. Deliberately not adopted into brewgraph-batch-export-v1 -- it is derived, and the correction belongs where the formula is known.",
+          "type": ["number", "null"]
+        },
+        "runTime": {
+          "description": "Total wake time: wake, associate, read, send, sleep. Drift indicates wifi association trouble, which is why it is carried into v1 rather than dropped.",
+          "type": ["number", "null"]
+        },
+        "created": { "type": "string", "minLength": 1 },
+        "active": {
+          "description": "BrewLogger's inverse of v1's `excluded`. `active: false` means the reading was set aside.",
+          "type": ["boolean", "null"]
+        },
+        "chamberTemperature": { "type": ["number", "null"] },
+        "beerTemperature": { "type": ["number", "null"] },
+        "batchId": { "type": ["integer", "null"] },
+        "id": { "type": ["integer", "null"] }
+      }
+    },
+
+    "pressureReading": {
+      "type": "object",
+      "required": ["created"],
+      "properties": {
+        "temperature": { "type": ["number", "null"] },
+        "pressure": { "type": ["number", "null"] },
+        "battery": { "type": ["number", "null"] },
+        "rssi": { "type": ["number", "null"] },
+        "runTime": { "type": ["number", "null"] },
+        "created": { "type": "string", "minLength": 1 },
+        "active": { "type": ["boolean", "null"] },
+        "batchId": { "type": ["integer", "null"] },
+        "id": { "type": ["integer", "null"] }
+      }
+    },
+
+    "pourEvent": {
+      "type": "object",
+      "description": "Tap pour events. Carried by BrewLogger, not mapped into v1 -- not needed for the training corpus and re-exportable if that changes.",
+      "required": ["created"],
+      "properties": {
+        "created": { "type": "string", "minLength": 1 },
+        "pour": { "type": ["number", "null"] },
+        "volume": { "type": ["number", "null"] },
+        "active": { "type": ["boolean", "null"] },
+        "batchId": { "type": ["integer", "null"] },
+        "id": { "type": ["integer", "null"] }
+      }
+    }
+  }
+}

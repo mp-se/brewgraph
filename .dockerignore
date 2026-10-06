@@ -1,0 +1,37 @@
+# Build context exclusions for builds that use the repository root as context.
+#
+# Only the web image does (see web/Dockerfile): it needs `api/oss/*.schema.json`
+# alongside `web/`, so its context cannot be `./web`. The api, ble, log and mdns
+# images each use their own subdirectory as context and therefore read their own
+# .dockerignore, not this file.
+#
+# Without this, the root context is ~1.2 GB and every build ships node_modules,
+# the venv and the git history to the daemon.
+
+.git
+.venv
+.venv-*
+node_modules
+**/node_modules
+
+# Build output and caches
+dist
+**/dist
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+**/.pytest_cache
+coverage
+**/coverage
+.ruff_cache
+
+# Local data and logs
+*.sqlite*
+log/*.log
+
+# Everything the web build has no use for. Listed rather than inverted with an
+# allow-list so a new top-level directory is included by default — a missing file
+# fails the build loudly, whereas a silently excluded one is what broke this in
+# the first place.
+docker-compose*.yaml

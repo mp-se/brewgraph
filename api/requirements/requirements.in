@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+pydantic>=2.0
+pydantic-settings
+apscheduler
+httpx
+redis
+psycopg2-binary
+scikit-learn==1.9.0
+numpy==2.5.0
+pandas
+scipy==1.18.0
+pyyaml

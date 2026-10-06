@@ -1,0 +1,173 @@
+/*
+ * Public display styles.
+ *
+ * Every colour, the font and the header are CSS custom properties on
+ * `.public-display`. The defaults follow the Bootstrap look of the main web UI
+ * (light and dark palettes, blue primary, system font stack, 6px radius).
+ *
+ * Branding, in increasing reach:
+ *   - Display settings from the API: `theme`, `primaryColor`, `logoUrl`,
+ *     `breweryName` (primaryColor is applied inline and wins over everything).
+ *   - `theme.css` next to index.html, loaded after this file (see main.ts). It
+ *     ships empty; a deployment replaces it to override any variable or rule
+ *     below without rebuilding the app.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+
+.public-display {
+  /* Bootstrap light */
+  --display-primary: #0d6efd;
+  --display-primary-text: var(--display-primary);
+  --display-bg: #f8f9fa;
+  --display-card: #fff;
+  --display-border: #dee2e6;
+  --display-text: #212529;
+  --display-sub: #6c757d;
+  --display-radius: 6px;
+  --display-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans',
+    'Liberation Sans', Arial, sans-serif;
+  /* The header is a primary-coloured bar, like the web UI's navbar. */
+  --display-header-bg: var(--display-primary);
+  --display-header-text: #fff;
+  --display-header-sub: rgba(255, 255, 255, 0.75);
+
+  min-height: 100vh;
+  background: var(--display-bg);
+  color: var(--display-text);
+  font-family: var(--display-font);
+}
+
+/* Bootstrap dark. Primary text uses Bootstrap's lighter tint for contrast. */
+.theme-dark {
+  --display-primary-text: #6ea8fe;
+  --display-bg: #212529;
+  --display-card: #2b3035;
+  --display-border: #495057;
+  --display-text: #dee2e6;
+  --display-sub: #adb5bd;
+}
+
+/* .theme-light uses the defaults above. */
+
+.theme-chalkboard {
+  --display-primary: #b0c9a0;
+  --display-bg: #2c3e2d;
+  --display-card: #243324;
+  --display-border: #4a5e4a;
+  --display-text: #e8f0e8;
+  --display-sub: #9aaf9a;
+  --display-font: 'Courier New', monospace;
+  --display-header-bg: transparent;
+  --display-header-text: var(--display-text);
+  --display-header-sub: var(--display-sub);
+}
+
+.theme-minimal {
+  --display-primary: #1a1a1a;
+  --display-bg: #fff;
+  --display-card: #fff;
+  --display-border: #ddd;
+  --display-text: #1a1a1a;
+  --display-sub: #888;
+  --display-header-bg: transparent;
+  --display-header-text: var(--display-text);
+  --display-header-sub: var(--display-sub);
+}
+
+/* Header: full-width bar, content aligned with the 760px column below. */
+.display-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 12px max(16px, calc((100% - 760px) / 2));
+  background: var(--display-header-bg);
+  color: var(--display-header-text);
+}
+.display-header h1, .display-header p { margin: 0; }
+.display-header h1 { font-size: 1.5rem; font-weight: 500; }
+.display-header p { color: var(--display-header-sub); }
+.display-logo { max-width: 160px; max-height: 48px; object-fit: contain; }
+.display-link {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--display-header-sub);
+  border-radius: var(--display-radius);
+  color: var(--display-header-text);
+  text-decoration: none;
+  font-weight: 500;
+}
+.display-link:hover { background: rgba(128, 128, 128, 0.2); }
+
+.muted { color: var(--display-sub); }
+
+.tap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 792px;
+  margin: 0 auto;
+  padding: 0 16px 16px;
+}
+.tap-grid-tv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: none;
+  gap: 16px;
+}
+
+.display-card {
+  padding: 16px;
+  border: 1px solid var(--display-border);
+  border-radius: var(--display-radius);
+  background: var(--display-card);
+}
+.display-card h2 { margin: 12px 0 0; font-size: 1.1rem; font-weight: 500; }
+.display-card p { margin: 4px 0; }
+.tap-heading { display: flex; gap: 12px; justify-content: space-between; align-items: center; }
+.tap-label { color: var(--display-primary-text); font-weight: 700; }
+.remaining { font-weight: 600; white-space: nowrap; }
+.stats { color: var(--display-sub); font-size: 0.8rem; }
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin: 0 3px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 50%;
+}
+.bar-track {
+  height: 5px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.3);
+}
+.bar-fill { height: 100%; border-radius: 3px; background: var(--display-primary); transition: width 0.3s; }
+.serving-readings { display: flex; gap: 16px; flex-wrap: wrap; margin: 14px 0 0; }
+.serving-readings div { display: grid; gap: 2px; }
+.serving-readings dt { color: var(--display-sub); font-size: 0.7rem; }
+.serving-readings dd { margin: 0; font-size: 0.85rem; }
+.serving-readings .stale { opacity: 0.55; }
+.serving-readings small { color: var(--display-sub); }
+.empty { margin-top: 18px !important; color: var(--display-sub); }
+.bottle-volume { color: var(--display-primary-text); font-weight: 600; }
+
+.display-center { display: flex; flex-direction: column; align-items: center; padding: 64px 16px; }
+.display-center span { font-size: 2.5rem; }
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--display-border);
+  border-top-color: var(--display-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tv-mode .display-header { padding-inline: 16px; }
+.tv-mode .display-header h1 { font-size: 2.2rem; }
+.tv-mode .display-card h2 { font-size: 1.35rem; }
+.tv-mode .display-card { padding: 20px; }

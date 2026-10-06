@@ -1,0 +1,156 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                ║
+║                          BREWGRAPH — DUAL LICENSE                              ║
+║                                                                                ║
+║         Open Source Use  →  GNU General Public License v3.0 (GPL v3)           ║
+║         Commercial Use   →  Commercial License Agreement (see below)           ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+Copyright (c) 2024-2026 Magnus Persson
+Project: https://github.com/mp-se/brewgraph
+
+────────────────────────────────────────────────────────────────────────────────
+
+CHOOSING YOUR LICENSE
+
+This software is available under two separate licenses. You must choose the one
+that applies to your use case:
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  LICENSE A — GPL v3 (Open Source)                                       │
+  │                                                                         │
+  │  Use this license if you:                                               │
+  │    • Use, study, or modify the software for personal or non-commercial  │
+  │      purposes                                                           │
+  │    • Distribute the software and ALL your modifications as open source  │
+  │      under GPL v3                                                       │
+  │                                                                         │
+  │  Obligation: You MUST publish your full source code under GPL v3.       │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  LICENSE B — Commercial License                                         │
+  │                                                                         │
+  │  You MUST obtain a Commercial License if you:                           │
+  │    • Distribute this software in a product or service WITHOUT releasing │
+  │      your source code under GPL v3                                      │
+  │    • Embed BrewGraph into a SaaS product or commercial hosted service   │
+  │                                                                         │
+  │  Contact: mpersson42(at)gmail.com                                       │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────
+
+ATTRIBUTION (required under both licenses)
+
+  • All "Copyright (c) Magnus Persson" notices must remain intact
+  • Include the copyright notice in source code, documentation, and in any
+    "About" or "System Info" screen in the software UI
+
+────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+
+                     GNU GENERAL PUBLIC LICENSE (LICENSE A)
+
+────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+
+Everyone is permitted to copy and distribute verbatim copies of this license
+document, but changing it is not allowed.
+
+For full GPL v3 terms, see: https://www.gnu.org/licenses/gpl-3.0.en.html
+
+────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+
+                          COMMERCIAL LICENSE (LICENSE B)
+
+────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+
+COMMERCIAL LICENSE AGREEMENT
+
+This Commercial License governs the use of BrewGraph software by parties who
+do not wish to comply with the obligations of the GNU General Public License
+v3.0 — primarily the requirement to publish your full source code.
+
+WHO NEEDS THIS LICENSE?
+
+You must obtain a Commercial License if you:
+
+  • Distribute BrewGraph (or a derivative work) in a product or service
+    WITHOUT releasing your full source code under GPL v3
+
+  • Are a company, business entity, or organization distributing BrewGraph
+    in any quantity
+
+  • Embed BrewGraph into a SaaS product or commercial hosted service
+
+  • Sell products containing BrewGraph on any marketplace (AliExpress,
+    Amazon, eBay, Tindie, etc.)
+
+WHAT THE COMMERCIAL LICENSE GRANTS
+
+Upon execution of a written agreement with the Licensor, the Licensee receives:
+
+  ✓ The right to incorporate BrewGraph into proprietary, closed-source
+    products without triggering GPL v3 source disclosure obligations
+
+  ✓ The right to distribute such products commercially without quantity limits
+
+  ✓ The right to modify BrewGraph without publishing those modifications
+
+  ✓ The right to operate BrewGraph as part of a hosted SaaS service
+
+  ✓ A royalty-free license for the agreed scope and term as defined in the
+    signed agreement
+
+REQUIREMENTS UNDER COMMERCIAL LICENSE
+
+The Licensee must:
+
+  1. Retain all "Copyright (c) Magnus Persson" notices in source code and
+     documentation
+
+  2. Display a copyright notice in any "About", "System Info", or equivalent
+     screen in the product UI:
+         "Portions copyright (c) Magnus Persson — https://github.com/mp-se/brewgraph"
+
+  3. Not sublicense, resell, or transfer the Commercial License rights
+     to any third party without prior written consent from the Licensor
+
+  4. Not misrepresent the origin of the software or remove attribution
+
+NO WARRANTY
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM
+THE USE OF THIS SOFTWARE.
+
+HOW TO OBTAIN A COMMERCIAL LICENSE
+
+To inquire about commercial licensing terms and pricing, contact:
+
+  Name:    Magnus Persson
+  Email:   mpersson42(at)gmail.com
+  GitHub:  https://github.com/peritex
+
+Please include in your inquiry:
+  • Intended use / product description
+  • Whether you are an individual or a business entity
+  • Estimated annual distribution volume or user base
+
+VIOLATION & ENFORCEMENT
+
+Unauthorized commercial use without a valid Commercial License constitutes
+a breach of copyright under applicable law and a violation of GPL v3.
+The Licensor reserves the right to pursue all available legal remedies,
+including injunctive relief and damages.

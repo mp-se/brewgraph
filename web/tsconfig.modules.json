@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitThis": true,
+    "allowJs": false
+  },
+  "include": ["src/modules/**/*.ts", "src/vite-env.d.ts", "types/vue-shim.d.ts"]
+}
