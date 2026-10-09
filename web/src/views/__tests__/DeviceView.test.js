@@ -44,13 +44,24 @@ const piniaMocks = vi.hoisted(() => ({
   vesselStore: {
     vesselList: [],
     getVesselList: vi.fn().mockResolvedValue([])
+  },
+  config: {
+    gravityFormat: 'SG',
+    temperatureFormat: 'C'
+  },
+  dashboardStore: {
+    data: null,
+    devices: [],
+    fetch: vi.fn().mockResolvedValue(null)
   }
 }))
 
 vi.mock('@/modules/pinia', () => ({
   global: piniaMocks.global,
   deviceStore: piniaMocks.deviceStore,
-  vesselStore: piniaMocks.vesselStore
+  vesselStore: piniaMocks.vesselStore,
+  config: piniaMocks.config,
+  dashboardStore: piniaMocks.dashboardStore
 }))
 
 vi.mock('@/modules/router', () => ({
@@ -354,6 +365,29 @@ describe('DeviceView - Enhanced', () => {
 
       expect(wrapper.find('.device-form-toggle__color-cue').exists()).toBe(false)
       expect(wrapper.find('.device-color-toggle__buttons').exists()).toBe(true)
+    })
+  })
+
+  describe('Gravity formula editor link', () => {
+    it('offers the formula editor for a stored gravity device', async () => {
+      const wrapper = await createWrapper({ id: 'device-1' })
+      const device = new Device({ id: 'device-1', name: 'Sensor', deviceType: 'ispindel' })
+      wrapper.vm.device = device
+      wrapper.vm.deviceSaved = Device.fromJson(device.toJson())
+      await flushPromises()
+      expect(wrapper.get('[data-testid="gravity-formula-link"]').text()).toContain('Formula editor')
+    })
+
+    it('offers nothing for a device that is not a gravity sensor or is not stored yet', async () => {
+      const wrapper = await createWrapper({ id: 'device-2' })
+      wrapper.vm.device = new Device({ id: 'device-2', name: 'Keg', deviceType: 'kegmon' })
+      wrapper.vm.deviceSaved = new Device({ id: 'device-2', name: 'Keg', deviceType: 'kegmon' })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="gravity-formula-link"]').exists()).toBe(false)
+
+      const created = await createWrapper({ id: 'new' })
+      await flushPromises()
+      expect(created.find('[data-testid="gravity-formula-link"]').exists()).toBe(false)
     })
   })
 

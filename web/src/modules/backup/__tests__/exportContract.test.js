@@ -54,7 +54,10 @@ const device = {
   name: 'Gravity',
   board: 'esp32',
   token: 'tok',
-  url: 'http://x'
+  url: 'http://x',
+  gravityFormula: '1+tilt/1000',
+  gravityFormulaUnit: 'sg',
+  gravityCalibrationData: [{ angle: 30, gravity: 1.03 }]
 }
 const batch = {
   id: 'b1',
@@ -109,6 +112,16 @@ describe('export document conforms to the shared schema', () => {
   it('keeps ingest tokens out of ml depth', () => {
     expect(build('ml').devices[0]).not.toHaveProperty('token')
     expect(build('backup').devices[0]).toHaveProperty('token')
+  })
+
+  it('carries calibration through backup depth only', () => {
+    const backup = build('backup')
+    expect(validate(backup) ? null : explain()).toBe(null)
+    expect(backup.devices[0]).toMatchObject({
+      gravityFormula: '1+tilt/1000', gravityFormulaUnit: 'sg',
+      gravityCalibrationData: [{ angle: 30, gravity: 1.03 }]
+    })
+    expect(build('ml').devices[0]).not.toHaveProperty('gravityFormula')
   })
 
   it('rejects a document that drops a reading column', () => {

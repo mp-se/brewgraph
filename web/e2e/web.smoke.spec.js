@@ -250,6 +250,30 @@ test('the device editor shows Collect logs once, as the header above the toggle'
   await expect(page.getByRole('switch', { name: 'Collect logs' })).toBeVisible()
 })
 
+test('opens the gravity formula editor and saves a calibration point', async ({ page }) => {
+  const state = await openApp(page, '/device/device-1', { devices: [sampleDevice()] })
+  await expect(page.getByTestId('gravity-formula-editor')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Formula editor' }).click()
+  await expect(page).toHaveURL(/\/device\/device-1\/gravity-formula$/)
+  const editor = page.getByTestId('gravity-formula-editor')
+  await expect(editor).toBeVisible()
+  await expect(editor.getByText('does not change the formula on the device', { exact: false })).toBeVisible()
+  await editor.getByRole('tab', { name: 'Table', exact: true }).click()
+  await editor.getByRole('button', { name: 'Add point' }).click()
+  await editor.getByLabel('Angle (°)').fill('30')
+  await editor.getByLabel('Gravity (SG)').fill('1.03')
+  await editor.getByLabel('Gravity (SG)').blur()
+  await editor.getByRole('tab', { name: 'Formula', exact: true }).click()
+  await editor.getByRole('textbox', { name: 'Formula' }).fill('1+tilt/1000')
+  await editor.getByRole('tab', { name: 'Graph', exact: true }).click()
+  await expect(editor.getByRole('img', { name: /Gravity calibration chart/ })).toBeVisible()
+  await page.getByRole('button', { name: /Save/ }).click()
+  await expect.poll(() => state.requests.findLast(request => request.method === 'PATCH' &&
+    request.path === 'devices/device-1')?.body?.gravityCalibrationData).toEqual([{ angle: 30, gravity: 1.03 }])
+  expect(state.requests.findLast(request => request.method === 'PATCH' &&
+    request.path === 'devices/device-1')?.body?.gravityFormula).toBe('1+tilt/1000')
+})
+
 test('opens the batch action menu and exports readings', async ({ page }) => {
   const state = await openApp(page, '/batch', {
     devices: [sampleDevice()],

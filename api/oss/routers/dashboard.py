@@ -140,6 +140,7 @@ async def get_dashboard(  # pylint: disable=too-many-arguments,too-many-position
             if r:
                 latest = LatestReading(
                     gravity=r.gravity,
+                    angle=r.angle,
                     temperature=r.temperature,
                     battery=r.battery,
                     rssi=r.rssi,

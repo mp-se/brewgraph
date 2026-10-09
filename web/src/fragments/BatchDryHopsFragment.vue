@@ -81,7 +81,7 @@
                 <AppInputNumber v-model="newHop.triggerHoursBefore" label="Hours before" unit="h" min="1" max="720" step="1" help="" />
               </div>
               <div class="col-6" v-if="newHop.triggerMethod === 'gravity_level'">
-                <AppInputNumber v-model="newHop.triggerGravity" label="Trigger SG" unit="SG" min="0.990" max="1.200" :step="stepFor('gravity')" help="" />
+                <AppInputNumber v-model="triggerGravityDisplay" label="Trigger gravity" :unit="gravityUnit" :min="gravityMin" :max="gravityMax" :step="stepFor('gravity')" help="" />
               </div>
             </div>
           </q-card-section>
@@ -99,10 +99,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { global } from '@/modules/pinia'
+import { config, global } from '@/modules/pinia'
 import { apiJson, apiOk } from '@/modules/apiClient'
 import { logDebug } from '@/ui'
-import { stepFor } from '@/modules/useUnitConversion'
+import { decimalsFor, stepFor } from '@/modules/useUnitConversion'
+import { gravityToPlato, platoToGravity, roundValue } from '@/modules/utils'
 
 const props = defineProps<{ batchId: string; readOnly?: boolean }>()
 const disabled = computed(() => global.disabled || !!props.readOnly)
@@ -129,10 +130,24 @@ const newHop = ref({
 })
 
 const addDialog = ref(false)
+const gravityUnit = computed(() => (config.isGravitySG ? 'SG' : 'P'))
+const gravityMin = computed(() => config.isGravitySG ? 0.990 : gravityToPlato(0.990))
+const gravityMax = computed(() => config.isGravitySG ? 1.200 : gravityToPlato(1.200))
+const triggerGravityDisplay = computed({
+  get: () => newHop.value.triggerGravity == null
+    ? null
+    : roundValue(config.isGravitySG ? newHop.value.triggerGravity : gravityToPlato(newHop.value.triggerGravity), decimalsFor('gravity')),
+  set: (value: number | null) => {
+    newHop.value.triggerGravity = value == null || Number.isNaN(value)
+      ? null
+      : config.isGravitySG ? value : platoToGravity(value)
+  }
+})
 
 function triggerLabel(h: DryHop): string {
   if (h.triggerMethod === 'gravity_level' && h.triggerGravity != null) {
-    return `SG ≤ ${h.triggerGravity.toFixed(3)}`
+    const gravity = config.isGravitySG ? h.triggerGravity : gravityToPlato(h.triggerGravity)
+    return `${gravityUnit.value} ≤ ${gravity.toFixed(decimalsFor('gravity'))}`
   }
   if (h.triggerHoursBefore != null) {
     return `${h.triggerHoursBefore}h before done`

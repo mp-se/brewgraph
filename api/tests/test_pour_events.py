@@ -99,6 +99,29 @@ def test_record_pour(app_client):
     assert "id" in data
 
 
+def test_pour_can_be_dated(app_client):
+    """A pour or a bottle pour logged with createdAt is stored at that time; without it, now."""
+    vessel_id = _setup(app_client)
+    when = "2026-03-02T18:30:00Z"
+    r = app_client.post(
+        f"/vessels/{vessel_id}/pours", json={"pourAmount": 0.5, "createdAt": when}, headers=headers,
+    )
+    assert r.status_code == 201
+    assert r.json()["createdAt"].startswith("2026-03-02T18:30:00")
+
+    now_pour = app_client.post(
+        f"/vessels/{vessel_id}/pours", json={"pourAmount": 0.5}, headers=headers,
+    ).json()
+    assert not now_pour["createdAt"].startswith("2026-03-02")
+
+    bottles = _setup_bottle_vessel(app_client)
+    r = app_client.post(
+        f"/vessels/{bottles}/pours/bottles", json={"bottleCount": 1, "createdAt": when}, headers=headers,
+    )
+    assert r.status_code == 201
+    assert r.json()["createdAt"].startswith("2026-03-02T18:30:00")
+
+
 def test_pour_decrements_volume(app_client):
     """Multiple pours cumulatively decrement the vessel's volume_remaining."""
     vessel_id = _setup(app_client)

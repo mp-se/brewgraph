@@ -152,7 +152,9 @@ class PourEventService(BaseService[PourEvent, PourEventCreate, PourEventCreate])
             )
         )
 
-    def record_pour(self, vessel_id: UUID, amount: float) -> PourEvent:
+    def record_pour(
+        self, vessel_id: UUID, amount: float, created_at: Optional[datetime] = None,
+    ) -> PourEvent:
         """Atomically decrement vessel volume and write a PourEvent row (keg)."""
         vessel = self.db_session.get(StorageVessel, vessel_id)
         if vessel is None or vessel.deleted_at is not None:
@@ -189,6 +191,7 @@ class PourEventService(BaseService[PourEvent, PourEventCreate, PourEventCreate])
             pour_amount=amount,
             volume_remaining=max(vessel.volume_remaining, 0.0),
             is_manual=False,
+            **({"created_at": created_at} if created_at is not None else {}),
         )
         self.db_session.add(event)
         if tap_id is not None:
@@ -200,7 +203,9 @@ class PourEventService(BaseService[PourEvent, PourEventCreate, PourEventCreate])
             raise e
         return event
 
-    def record_bottle_pour(self, vessel_id: UUID, bottle_count: int) -> PourEvent:
+    def record_bottle_pour(
+        self, vessel_id: UUID, bottle_count: int, created_at: Optional[datetime] = None,
+    ) -> PourEvent:
         """Decrement bottles_remaining and write a PourEvent row (bottle vessel)."""
         vessel = self.db_session.get(StorageVessel, vessel_id)
         if vessel is None or vessel.deleted_at is not None:
@@ -238,6 +243,7 @@ class PourEventService(BaseService[PourEvent, PourEventCreate, PourEventCreate])
             pour_amount=pour_amount,
             volume_remaining=new_volume,
             is_manual=True,
+            **({"created_at": created_at} if created_at is not None else {}),
         )
         self.db_session.add(event)
         if tap_id is not None:

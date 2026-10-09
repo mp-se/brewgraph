@@ -101,6 +101,7 @@
       "required": ["gravity", "angle", "velocity"],
       "properties": {
         "gravity": { "$ref": "#/$defs/nullableNumber" },
+        "reportedGravity": { "$ref": "#/$defs/nullableNumber" },
         "angle": { "$ref": "#/$defs/nullableNumber" },
         "velocity": { "$ref": "#/$defs/nullableNumber" }
       }
@@ -168,7 +169,20 @@
         "description": { "$ref": "#/$defs/nullableString" },
         "batchId": { "$ref": "#/$defs/nullableString" },
         "vesselId": { "$ref": "#/$defs/nullableString" },
-        "batchRole": { "$ref": "#/$defs/nullableString" }
+        "batchRole": { "$ref": "#/$defs/nullableString" },
+        "gravityFormula": { "$ref": "#/$defs/nullableString", "maxLength": 200 },
+        "gravityFormulaUnit": { "type": ["string", "null"], "enum": ["sg", "plato", null] },
+        "gravityCalibrationData": {
+          "type": "array", "maxItems": 20,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["angle", "gravity"],
+            "properties": {
+              "angle": { "type": "number", "minimum": 15, "maximum": 90 },
+              "gravity": { "type": "number", "minimum": 0.98, "maximum": 1.25 }
+            }
+          }
+        }
       }
     },
 

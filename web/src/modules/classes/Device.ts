@@ -81,6 +81,11 @@ export interface FermentationStepData {
   deviceId: string | null
 }
 
+export interface GravityCalibrationPoint {
+  angle: number
+  gravity: number
+}
+
 interface DeviceParams {
   id?: string
   name?: string
@@ -99,6 +104,9 @@ interface DeviceParams {
   batchRole?: string | null
   vesselId?: string | null
   failedIngestCounter?: number
+  gravityFormula?: string | null
+  gravityFormulaUnit?: 'sg' | 'plato' | null
+  gravityCalibrationData?: GravityCalibrationPoint[]
 }
 
 export class Device {
@@ -119,6 +127,9 @@ export class Device {
   private _batchRole: string | null
   private _vesselId: string | null
   private _failedIngestCounter: number
+  private _gravityFormula: string | null
+  private _gravityFormulaUnit: 'sg' | 'plato' | null
+  private _gravityCalibrationData: GravityCalibrationPoint[]
 
   constructor({
     id = '',
@@ -137,7 +148,10 @@ export class Device {
     batchId = null,
     batchRole = null,
     vesselId = null,
-    failedIngestCounter = 0
+    failedIngestCounter = 0,
+    gravityFormula = null,
+    gravityFormulaUnit = null,
+    gravityCalibrationData = []
   }: DeviceParams = {}) {
     this._id = id
     this._name = name
@@ -156,6 +170,9 @@ export class Device {
     this._batchRole = batchRole ?? null
     this._vesselId = vesselId ?? null
     this._failedIngestCounter = failedIngestCounter ?? 0
+    this._gravityFormula = gravityFormula ?? null
+    this._gravityFormulaUnit = gravityFormulaUnit ?? null
+    this._gravityCalibrationData = gravityCalibrationData ?? []
   }
 
   static compare(d1: Device, d2: Device): boolean {
@@ -174,7 +191,10 @@ export class Device {
       d1.collectLogs === d2.collectLogs &&
       d1.batchId === d2.batchId &&
       d1.batchRole === d2.batchRole &&
-      d1.vesselId === d2.vesselId
+      d1.vesselId === d2.vesselId &&
+      d1.gravityFormula === d2.gravityFormula &&
+      d1.gravityFormulaUnit === d2.gravityFormulaUnit &&
+      JSON.stringify(d1.gravityCalibrationData) === JSON.stringify(d2.gravityCalibrationData)
     )
   }
 
@@ -196,7 +216,10 @@ export class Device {
       batchId: (d.batchId as string | null) ?? null,
       batchRole: (d.batchRole as string | null) ?? null,
       vesselId: (d.vesselId as string | null) ?? null,
-      failedIngestCounter: (d.failedIngestCounter as number) ?? 0
+      failedIngestCounter: (d.failedIngestCounter as number) ?? 0,
+      gravityFormula: (d.gravityFormula as string | null) ?? null,
+      gravityFormulaUnit: (d.gravityFormulaUnit as 'sg' | 'plato' | null) ?? null,
+      gravityCalibrationData: (d.gravityCalibrationData as GravityCalibrationPoint[]) ?? []
     })
   }
 
@@ -214,7 +237,10 @@ export class Device {
       collectLogs: this.collectLogs,
       batchId: this.batchId,
       batchRole: this.batchRole,
-      vesselId: this.vesselId
+      vesselId: this.vesselId,
+      gravityFormula: this.gravityFormula,
+      gravityFormulaUnit: this.gravityFormulaUnit,
+      gravityCalibrationData: this.gravityCalibrationData
     }
   }
 
@@ -269,6 +295,9 @@ export class Device {
   get failedIngestCounter() {
     return this._failedIngestCounter
   }
+  get gravityFormula() { return this._gravityFormula }
+  get gravityFormulaUnit() { return this._gravityFormulaUnit }
+  get gravityCalibrationData() { return this._gravityCalibrationData }
 
   set id(v: string) {
     this._id = v
@@ -315,6 +344,9 @@ export class Device {
   set vesselId(v: string | null) {
     this._vesselId = v
   }
+  set gravityFormula(v: string | null) { this._gravityFormula = v }
+  set gravityFormulaUnit(v: 'sg' | 'plato' | null) { this._gravityFormulaUnit = v }
+  set gravityCalibrationData(v: GravityCalibrationPoint[]) { this._gravityCalibrationData = v }
 
   // Device type helpers — use these in the UI instead of comparing device_type strings directly
 

@@ -17,6 +17,7 @@ import { logDebug } from '@/ui'
 const HomeView = () => import('@/views/HomeView.vue')
 const DeviceView = () => import('@/views/DeviceView.vue')
 const DeviceLogView = () => import('@/views/DeviceLogView.vue')
+const DeviceGravityFormulaView = () => import('@/views/DeviceGravityFormulaView.vue')
 const DeviceListView = () => import('@/views/DeviceListView.vue')
 const BatchView = () => import('@/views/BatchView.vue')
 const BatchListView = () => import('@/views/BatchListView.vue')
@@ -47,6 +48,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/device', name: 'device-list', component: DeviceListView },
   { path: '/device/log/:id', name: 'device-log', component: DeviceLogView },
+  { path: '/device/:id/gravity-formula', name: 'device-gravity-formula', component: DeviceGravityFormulaView },
   { path: '/device/:id', name: 'device', component: DeviceView },
   { path: '/batch', name: 'batch-list', component: BatchListView },
   { path: '/batch/compare', name: 'batch-compare-view', component: BatchGravityGraphCompareView },

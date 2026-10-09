@@ -174,6 +174,12 @@ describe('HomeView - Enhanced', () => {
       const rows = wrapper.findAll('.row')
       expect(rows.length).toBeGreaterThan(0)
     })
+
+    it('separates the latest readings row from the status cards', () => {
+      const wrapper = createWrapper()
+      expect(wrapper.find('.home-readings-section').exists()).toBe(true)
+      expect(wrapper.find('.home-readings-section > .row').exists()).toBe(true)
+    })
   })
 
   describe('Toggle Switches', () => {

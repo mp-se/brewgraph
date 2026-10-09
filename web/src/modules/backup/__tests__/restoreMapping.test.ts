@@ -59,14 +59,20 @@ describe('backup restore mapping', () => {
       deviceFiltered: false,
       batchId: 'old-batch',
       batchRole: 'gravity',
-      vesselId: 'old-vessel'
+      vesselId: 'old-vessel',
+      gravityFormula: '1+tilt/1000',
+      gravityFormulaUnit: 'sg',
+      gravityCalibrationData: [{ angle: 30, gravity: 1.03 }]
     })
 
     expect(result.payload).toMatchObject({
       id: 'old-device',
       chipId: 'aabbcc',
       fermentationStep: [],
-      collectLogs: false
+      collectLogs: false,
+      gravityFormula: '1+tilt/1000',
+      gravityFormulaUnit: 'sg',
+      gravityCalibrationData: [{ angle: 30, gravity: 1.03 }]
     })
     expect(result.payload).not.toHaveProperty('role')
     expect(result.payload).not.toHaveProperty('batchId')

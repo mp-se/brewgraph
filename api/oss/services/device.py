@@ -11,7 +11,7 @@
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import sqlalchemy
 from sqlalchemy import func, select
@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException
 
 from core.enums import DeviceColor, DeviceStatus
 from core.models.registry import resolve_model
+from oss.gravity_formula import can_carry_formula
 from oss.schemas.device import (DeviceCreate, DeviceStatusResponse,
                                  DeviceUpdate)
 from oss.services.base import BaseService
@@ -36,6 +37,43 @@ class DeviceService(BaseService[Device, DeviceCreate, DeviceUpdate]):
 
     def __init__(self, db_session: Session):
         super().__init__(Device, db_session)
+
+    @staticmethod
+    def _validate_gravity_calibration(device_type, formula, points, unit=None) -> None:
+        """Only gravity devices (or a device of not-yet-known type) may own calibration."""
+        has_calibration = bool(formula and formula.strip()) or bool(points) or unit is not None
+        if has_calibration and not can_carry_formula(device_type):
+            raise HTTPException(
+                status_code=422,
+                detail="Gravity formula, formula unit and calibration data are supported "
+                       "only for gravity devices",
+            )
+
+    def create(self, obj: DeviceCreate) -> Device:
+        """Create a device after validating any attached gravity calibration data."""
+        data = obj.model_dump()
+        self._validate_gravity_calibration(
+            data.get("device_type"),
+            data.get("gravity_formula"),
+            data.get("gravity_calibration_data"),
+            data.get("gravity_formula_unit"),
+        )
+        return super().create(obj)
+
+    def update(self, item_id: Any, obj: DeviceUpdate) -> Optional[Device]:
+        """Validate calibration against the effective device type before updating."""
+        current = self.get_active(item_id)
+        if current is None:
+            return None
+
+        changes = obj.model_dump(exclude_unset=True)
+        self._validate_gravity_calibration(
+            changes.get("device_type", current.device_type),
+            changes.get("gravity_formula", current.gravity_formula),
+            changes.get("gravity_calibration_data", current.gravity_calibration_data),
+            changes.get("gravity_formula_unit", current.gravity_formula_unit),
+        )
+        return super().update(item_id, obj)
 
     def list(self) -> List[Device]:
         """Return all non-deleted devices."""

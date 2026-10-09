@@ -50,7 +50,7 @@
         <div class="col-md-2">
           <AppInputNumber
             v-model="infoOG"
-            label="Filter OG"
+            :label="`Filter OG (${config.isGravitySG ? 'SG' : 'P'})`"
             :step="stepFor('gravity')"
             :disabled="global.disabled"
           ></AppInputNumber>
@@ -58,7 +58,7 @@
         <div class="col-md-2">
           <AppInputNumber
             v-model="infoFG"
-            label="Filter FG"
+            :label="`Filter FG (${config.isGravitySG ? 'SG' : 'P'})`"
             :step="stepFor('gravity')"
             :disabled="global.disabled"
           ></AppInputNumber>
@@ -229,7 +229,7 @@
 import { onMounted, ref } from 'vue'
 import { config, gravityStore, batchStore, global } from '@/modules/pinia'
 import router from '@/modules/router'
-import { gravityToPlato, getGravityDataAnalytics, getFormattedTemperature } from '@/modules/utils'
+import { gravityToPlato, platoToGravity, getGravityDataAnalytics, getFormattedTemperature } from '@/modules/utils'
 import { stepFor } from '@/modules/useUnitConversion'
 import { logDebug, logError } from '@/ui'
 import { formatLocalTimestamp, localDateEnd, localDateStart } from '@/core'
@@ -292,6 +292,8 @@ async function updateGravity(id) {
 async function apply() {
   const last = localDateEnd(infoLastDay.value)
   const first = localDateStart(infoFirstDay.value)
+  const og = config.isGravitySG || infoOG.value == null ? infoOG.value : platoToGravity(infoOG.value)
+  const fg = config.isGravitySG || infoFG.value == null ? infoFG.value : platoToGravity(infoFG.value)
 
   logDebug('BatchGravityListView.apply()', first, last, infoOG.value, infoFG.value)
 
@@ -301,7 +303,7 @@ async function apply() {
       const date = Date.parse(g.created)
       let excluded = true
 
-      if (date <= last && date >= first && g.gravity <= infoOG.value && g.gravity >= infoFG.value)
+      if (date <= last && date >= first && g.gravity <= og && g.gravity >= fg)
         excluded = false
 
       if (g.excluded != excluded) {

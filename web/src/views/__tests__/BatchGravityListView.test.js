@@ -15,6 +15,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import BatchGravityListView from '../BatchGravityListView.vue'
 import { nextTick } from 'vue'
 import { sortList } from '@/modules/ui'
+import { platoToGravity } from '@/modules/utils'
 
 const mockStores = vi.hoisted(() => ({
   batch: {
@@ -92,7 +93,8 @@ vi.mock('@/modules/utils', async (importActual) => {
   return {
     ...actual,
     getGravityDataAnalytics: () => mockStores.analytics,
-    getFormattedTemperature: (t) => `${t} C`
+    getFormattedTemperature: (t) => `${t} C`,
+    platoToGravity: vi.fn((value) => value == 12 ? 1.042 : 1.038)
   }
 })
 
@@ -188,6 +190,26 @@ describe('BatchGravityListView', () => {
     await wrapper.vm.apply()
 
     expect(mockStores.gravity.updateGravity).toHaveBeenCalled()
+  })
+
+  it('converts Plato filter values to SG before comparing readings', async () => {
+    mockStores.config.isGravitySG = false
+    const wrapper = mountWrapper()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+
+    wrapper.vm.infoFirstDay = '2023-01-01 00:00:00'
+    wrapper.vm.infoLastDay = '2023-01-04 00:00:00'
+    wrapper.vm.infoOG = 12
+    wrapper.vm.infoFG = 10
+
+    await wrapper.vm.apply()
+
+    expect(mockStores.config.isGravitySG).toBe(false)
+    expect(platoToGravity).toHaveBeenCalledWith(12)
+    expect(platoToGravity).toHaveBeenCalledWith(10)
+    mockStores.config.isGravitySG = true
   })
 
   it('handles apply() failure when updateGravity fails', async () => {

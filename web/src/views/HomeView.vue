@@ -118,50 +118,52 @@
       :pressure-count="pressureCount"
     />
 
-    <div class="row q-col-gutter-md q-mt-xs">
-      <LatestReadingsFragment title="Latest Gravity Readings" :readings="latestGravityReadings">
-        <template #headers>
-          <th>Gravity</th>
-          <th>Velocity</th>
-          <th>Temp</th>
-        </template>
-        <template #row="{ reading }">
-          <td>{{ Number(reading.gravity).toFixed(4) }}</td>
-          <td>
-            {{ reading.velocity !== null ? Number(reading.velocity).toFixed(4) : '--' }}
-          </td>
-          <td>{{ getFormattedTemperature(reading.temperature) }}</td>
-        </template>
-      </LatestReadingsFragment>
+    <section class="home-readings-section">
+      <div class="row q-col-gutter-md">
+        <LatestReadingsFragment title="Latest Gravity Readings" :readings="latestGravityReadings">
+          <template #headers>
+            <th>Gravity</th>
+            <th>Velocity</th>
+            <th>Temp</th>
+          </template>
+          <template #row="{ reading }">
+            <td>{{ Number(reading.gravity).toFixed(4) }}</td>
+            <td>
+              {{ reading.velocity !== null ? Number(reading.velocity).toFixed(4) : '--' }}
+            </td>
+            <td>{{ getFormattedTemperature(reading.temperature) }}</td>
+          </template>
+        </LatestReadingsFragment>
 
-      <LatestReadingsFragment title="Latest Pressure Readings" :readings="latestPressureReadings">
-        <template #headers>
-          <th>Pressure</th>
-          <th>Temp</th>
-          <th>Battery</th>
-        </template>
-        <template #row="{ reading }">
-          <td>{{ getFormattedPressure(reading.pressure) }}</td>
-          <td>{{ getFormattedTemperature(reading.temperature) }}</td>
-          <td>{{ Number(reading.battery).toFixed(2) }}V</td>
-        </template>
-      </LatestReadingsFragment>
+        <LatestReadingsFragment title="Latest Pressure Readings" :readings="latestPressureReadings">
+          <template #headers>
+            <th>Pressure</th>
+            <th>Temp</th>
+            <th>Battery</th>
+          </template>
+          <template #row="{ reading }">
+            <td>{{ getFormattedPressure(reading.pressure) }}</td>
+            <td>{{ getFormattedTemperature(reading.temperature) }}</td>
+            <td>{{ Number(reading.battery).toFixed(2) }}V</td>
+          </template>
+        </LatestReadingsFragment>
 
-      <LatestReadingsFragment title="Latest Pour Readings" :readings="latestPourReadings">
-        <template #headers>
-          <th>Volume (L)</th>
-          <th>Pour (cl)</th>
-          <th></th>
-          <th></th>
-        </template>
-        <template #row="{ reading }">
-          <td>{{ getFormattedVolume(reading.volumeRemaining) }}</td>
-          <td>{{ getFormattedPourVolume(reading.pourAmount * 100) }}</td>
-          <td></td>
-          <td></td>
-        </template>
-      </LatestReadingsFragment>
-    </div>
+        <LatestReadingsFragment title="Latest Pour Readings" :readings="latestPourReadings">
+          <template #headers>
+            <th>Volume (L)</th>
+            <th>Pour (cl)</th>
+            <th></th>
+            <th></th>
+          </template>
+          <template #row="{ reading }">
+            <td>{{ getFormattedVolume(reading.volumeRemaining) }}</td>
+            <td>{{ getFormattedPourVolume(reading.pourAmount * 100) }}</td>
+            <td></td>
+            <td></td>
+          </template>
+        </LatestReadingsFragment>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -560,3 +562,9 @@ async function fetchScheduler() {
     })
 }
 </script>
+
+<style scoped>
+.home-readings-section {
+  margin-top: 16px;
+}
+</style>

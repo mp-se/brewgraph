@@ -51,6 +51,8 @@ class PourEventCreate(BaseModel):
     )
 
     pour_amount: float = Field(gt=0)
+    # When the pour happened; the time of the request when omitted.
+    created_at: Optional[datetime] = None
 
     _quantise_pour_amount = quantised("pour_amount", quantity="volume")
 
@@ -65,6 +67,8 @@ class BottlePourCreate(BaseModel):
     )
 
     bottle_count: int = Field(1, ge=1)
+    # When the bottles were taken; the time of the request when omitted.
+    created_at: Optional[datetime] = None
 
 
 class PourEventResponse(BaseModel):

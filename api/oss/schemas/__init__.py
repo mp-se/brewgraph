@@ -11,7 +11,7 @@
 from oss.schemas.batch import (BatchBase, BatchCreate, BatchListResponse,
                                 BatchResponse, BatchUpdate)
 from oss.schemas.device import (DeviceBase, DeviceCreate, DeviceResponse,
-                                 DeviceUpdate)
+                                 DeviceUpdate, GravityCalibrationPoint)
 from oss.schemas.gravity_reading import (GravityChartPoint,
                                           GravityReadingBase,
                                           GravityReadingCreate,
@@ -36,6 +36,7 @@ from oss.schemas.public_display import (PublicBottleItem,
 
 __all__ = [
     "DeviceBase", "DeviceCreate", "DeviceUpdate", "DeviceResponse",
+    "GravityCalibrationPoint",
     "BatchBase", "BatchCreate", "BatchUpdate", "BatchResponse",
     "BatchListResponse",
     "GravityReadingBase", "GravityReadingCreate", "GravityReadingUpdate",

@@ -26,6 +26,7 @@ const mockStores = vi.hoisted(() => ({
   config: {
     isGravitySG: true,
     isTempC: true,
+    precision: { gravity: 4 },
     $subscribe: vi.fn(),
     $patch: vi.fn()
   },
@@ -217,5 +218,14 @@ describe('BatchGravityGraphCompareView', () => {
     await nextTick()
 
     expect(wrapper.vm.gravityData1.length).toBe(0)
+  })
+
+  it('uses the configured gravity precision for plotted values', async () => {
+    mockStores.config.precision.gravity = 2
+    const wrapper = await mountWrapper()
+
+    expect(wrapper.vm.mapGravityData([{ gravity: 1.046, created: '2023-01-01T10:00:00Z' }], null, null, 0)[0].y)
+      .toBe(1.05)
+    mockStores.config.precision.gravity = 4
   })
 })

@@ -118,7 +118,7 @@ async def record_pour(
 ) -> Any:
     """Record a pour from a keg and atomically decrement volume_remaining."""
     logger.info("Endpoint POST /vessels/%s/pours", vessel_id)
-    result = pour_service.record_pour(vessel_id, pour.pour_amount)
+    result = pour_service.record_pour(vessel_id, pour.pour_amount, pour.created_at)
     background_tasks.add_task(notify_clients, "vessel", "update", vessel_id,
                                    DEFAULT_TENANT_ID, source="vessel")
     return result
@@ -140,7 +140,7 @@ async def record_bottle_pour(
 ) -> Any:
     """Record consuming one or more bottles and decrement bottles_remaining."""
     logger.info("Endpoint POST /vessels/%s/pours/bottles count=%d", vessel_id, pour.bottle_count)
-    result = pour_service.record_bottle_pour(vessel_id, pour.bottle_count)
+    result = pour_service.record_bottle_pour(vessel_id, pour.bottle_count, pour.created_at)
     background_tasks.add_task(notify_clients, "vessel", "update", vessel_id,
                                    DEFAULT_TENANT_ID, source="vessel")
     return result

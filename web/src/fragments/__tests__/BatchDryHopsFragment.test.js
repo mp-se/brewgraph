@@ -3,12 +3,16 @@ import { mount } from '@vue/test-utils'
 import BatchDryHopsFragment from '../BatchDryHopsFragment.vue'
 
 const mocks = vi.hoisted(() => ({
+  config: { isGravitySG: true },
   global: { disabled: false, messageError: '' },
   apiJson: vi.fn().mockResolvedValue({ dryHops: [] }),
   apiOk: vi.fn().mockResolvedValue(true)
 }))
 
-vi.mock('@/modules/pinia', () => ({ global: mocks.global }))
+vi.mock('@/modules/pinia', () => ({
+  config: mocks.config,
+  global: mocks.global
+}))
 vi.mock('@/modules/apiClient', () => ({ apiJson: mocks.apiJson, apiOk: mocks.apiOk }))
 vi.mock('bootstrap', () => ({
   Modal: class {
@@ -56,5 +60,20 @@ describe('BatchDryHopsFragment add modal', () => {
     expect(mocks.apiOk).toHaveBeenCalledWith('POST', 'batches/batch-1/dry-hops', [
       expect.objectContaining({ name: 'Citra' })
     ])
+  })
+
+  it('converts a Plato gravity trigger to canonical SG before submitting', async () => {
+    mocks.config.isGravitySG = false
+    const wrapper = mountFragment()
+    wrapper.vm.newHop.name = 'Citra'
+    wrapper.vm.newHop.triggerMethod = 'gravity_level'
+    wrapper.vm.triggerGravityDisplay = 12
+
+    await wrapper.vm.addDryHop()
+
+    const payload = mocks.apiOk.mock.calls.at(-1)[2][0]
+    expect(payload.triggerGravity).toBeGreaterThan(1)
+    expect(payload.triggerGravity).toBeLessThan(1.1)
+    mocks.config.isGravitySG = true
   })
 })

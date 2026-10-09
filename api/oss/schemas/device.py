@@ -10,14 +10,31 @@
 """Device Pydantic schemas."""
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, field_validator,
+                      model_validator)
 
 from core.enums import DeviceBatchRole, DeviceColor, DeviceStatus
 from core.schemas.envelope import build_envelope, reject_if_too_large
+from oss.gravity_formula import (GRAVITY_CALIBRATION_MAX_POINTS,
+                                 GRAVITY_FORMULA_MAX_LENGTH, FormulaUnit,
+                                 effective_formula_unit, validate_formula)
 from oss.registries.device_types import device_type_registry
 from oss.schemas._camel import to_camel
+
+
+class GravityCalibrationPoint(BaseModel):
+    """A known gravity measurement paired with a sensor tilt angle."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        extra="forbid",
+    )
+
+    angle: FiniteFloat = Field(ge=15, le=90)
+    gravity: FiniteFloat = Field(ge=0.98, le=1.25)
 
 
 class DeviceBase(BaseModel):
@@ -47,6 +64,35 @@ class DeviceBase(BaseModel):
     # than JSON is accepted and kept as {"raw": "..."} — the server does not interpret
     # this field, so refusing it would only lose the backup.
     config: Optional[Union[Dict[str, Any], str]] = Field(default=None)
+    gravity_formula: Optional[str] = Field(default=None, max_length=GRAVITY_FORMULA_MAX_LENGTH)
+    # `null` selects the device family's default unit; reads return the effective unit.
+    gravity_formula_unit: Optional[FormulaUnit] = Field(default=None)
+    # `null` and `[]` both mean "no points" and are stored as `[]`; an omitted field is
+    # left out of a partial update (`exclude_unset`), so it never overwrites stored points.
+    gravity_calibration_data: Optional[List[GravityCalibrationPoint]] = Field(
+        default_factory=list, max_length=GRAVITY_CALIBRATION_MAX_POINTS
+    )
+
+    @field_validator("gravity_formula")
+    @classmethod
+    def _blank_formula_is_no_formula(cls, value: Optional[str]) -> Optional[str]:
+        """Store an empty or whitespace-only formula as no formula."""
+        if value is None or not value.strip():
+            return None
+        validate_formula(value)
+        return value
+
+    @field_validator("gravity_calibration_data")
+    @classmethod
+    def _calibration_points_normalised(
+        cls, value: Optional[List[GravityCalibrationPoint]]
+    ) -> List[GravityCalibrationPoint]:
+        """Map `null` to `[]` and reject two points at the same angle."""
+        points = value or []
+        angles = [point.angle for point in points]
+        if len(set(angles)) != len(angles):
+            raise ValueError("calibration points must have distinct angles")
+        return points
 
     @field_validator("config", mode="before")
     @classmethod
@@ -84,6 +130,14 @@ class DeviceResponse(DeviceBase):
     failed_ingest_counter: int = 0
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="after")
+    def _report_effective_formula_unit(self) -> "DeviceResponse":
+        """Replace a stored `null` unit by the family default (`null` if no formula allowed)."""
+        self.gravity_formula_unit = effective_formula_unit(
+            self.device_type, self.name, self.gravity_formula_unit
+        )
+        return self
 
 
 class DeviceStatusResponse(BaseModel):

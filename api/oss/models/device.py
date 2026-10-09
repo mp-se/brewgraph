@@ -16,14 +16,15 @@ from core.models import Base
 from core.models.types import UtcDateTime
 from core.models.registry import register_model
 from oss.extensions.tenant import DEFAULT_TENANT_ID
+from oss.gravity_formula import GRAVITY_FORMULA_MAX_LENGTH
 
 
 class Device(Base):
     """Physical sensor device, optionally linked to a batch and/or storage vessel.
 
     `token_prefix` is an indexed prefix of `token`, for looking a device up without
-    scanning every row. `mdns`, `url`, `config`, `device_color` and `collect_logs` carry the
-    device's local-network addressing and display settings.
+    scanning every row. `mdns`, `url`, opaque firmware `config`, app-managed gravity
+    calibration data, `device_color` and `collect_logs` carry device settings.
 
     Constraints that are policy rather than shape live in the migration, not here: the
     UNIQUE on `token` and the per-`chip_id` uniqueness are declared in `000`.
@@ -59,6 +60,13 @@ class Device(Base):
     # it is whatever the firmware returned, and a firmware that answers with plain text
     # is kept as {"raw": "..."} rather than rejected.
     config = mapped_column(JsonDocument, nullable=False, default=dict)
+    # App-managed calibration metadata is separate from the opaque firmware backup above.
+    gravity_formula = mapped_column(
+        String(GRAVITY_FORMULA_MAX_LENGTH), nullable=True, default=None
+    )
+    # `sg` | `plato`; NULL means the device family's default unit.
+    gravity_formula_unit = mapped_column(String(5), nullable=True, default=None)
+    gravity_calibration_data = mapped_column(JsonDocument, nullable=False, default=list)
     device_color = mapped_column(
         Enum(DeviceColor, values_callable=lambda enum: [member.value for member in enum]),
         nullable=False,

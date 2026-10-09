@@ -47,6 +47,7 @@ class LatestReadingBase(BaseModel):
     model_config = _camel_config()
 
     gravity: Optional[float] = None
+    angle: Optional[float] = None
     pressure: Optional[float] = None
     temperature: Optional[float] = None
     # Volts, as stored — see `oss/services/ingestion.py`. A percentage (`_soc`

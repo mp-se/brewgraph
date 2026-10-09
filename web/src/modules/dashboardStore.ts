@@ -26,6 +26,7 @@ export interface DashboardPrediction {
 
 export interface DashboardLatestReading {
   gravity: number | null
+  angle?: number | null
   pressure: number | null
   temperature: number | null
   battery: number | null

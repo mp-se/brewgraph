@@ -1,0 +1,33 @@
+{
+  "limits": {
+    "minAngle": 15,
+    "maxAngle": 90,
+    "minGravitySg": 0.98,
+    "maxGravitySg": 1.25,
+    "maxTokens": 128,
+    "maxLength": 200,
+    "maxPoints": 20
+  },
+  "valid": [
+    { "formula": "1.000 + 0.001 * tilt", "unit": "sg", "tilt": 45, "temp": 20, "gravitySg": 1.045 },
+    { "formula": "12 + 0.1 * tilt", "unit": "plato", "tilt": 30, "temp": 20, "gravitySg": 1.0611230158692584 },
+    { "formula": "1.01 + (tilt - 15)^2 / 10000", "unit": "sg", "tilt": 15, "temp": 20, "gravitySg": 1.01 },
+    { "formula": "1.01 + (tilt - 15)^2 / 10000", "unit": "sg", "tilt": 15.01, "temp": 20, "gravitySg": 1.01000001 },
+    { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 90, "temp": 20, "gravitySg": 1.1 },
+    { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 89.99, "temp": 20, "gravitySg": 1.09999 },
+    { "formula": "1.025 + (temp - 20) / 1000", "unit": "sg", "tilt": 30, "temp": 25, "gravitySg": 1.03 }
+  ],
+  "invalidFormula": [
+    "tilt + unknown", "__proto__", "constructor", "pi", "1e2", "tilt^0", "tilt^7", "tilt^-1", "tilt^(2)", "tilt^temp", "1 +", "(tilt", "tilt;1", ""
+  ],
+  "invalidReading": [
+    { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 14.99, "temp": 20 },
+    { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 90.01, "temp": 20 },
+    { "formula": "1 / (tilt - 15)", "unit": "sg", "tilt": 15, "temp": 20 },
+    { "formula": "1.5", "unit": "sg", "tilt": 30, "temp": 20 }
+  ],
+  "temperatureCorrection": [
+    { "gravitySg": 1.05, "tempC": 20, "calibrationTempC": 20, "correctedSg": 1.05 },
+    { "gravitySg": 1.05, "tempC": 25, "calibrationTempC": 20, "correctedSg": 1.0511745304031856 }
+  ]
+}

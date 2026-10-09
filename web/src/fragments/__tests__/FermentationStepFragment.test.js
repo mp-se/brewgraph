@@ -142,6 +142,24 @@ describe('FermentationStepFragment - Inline Editor', () => {
       expect(wrapper.text()).toContain('(F)')
     })
 
+    it('converts stored Celsius temperatures when displaying Fahrenheit', () => {
+      const wrapper = mount(FermentationStepFragment, {
+        props: { fermentationSteps: sampleSteps, tempUnit: 'F', editable: false }
+      })
+
+      expect(wrapper.text()).toContain('68')
+    })
+
+    it('converts Fahrenheit input back to Celsius before emitting', async () => {
+      const wrapper = mount(FermentationStepFragment, {
+        props: { fermentationSteps: sampleSteps, tempUnit: 'F' }
+      })
+
+      await wrapper.find('input[type="number"]').setValue(69.8)
+
+      expect(wrapper.emitted('update:fermentationSteps')[0][0][0].temp).toBeCloseTo(21, 5)
+    })
+
     it('should have temperature input with step attribute', () => {
       const wrapper = mount(FermentationStepFragment, {
         props: {
@@ -150,7 +168,7 @@ describe('FermentationStepFragment - Inline Editor', () => {
         }
       })
       const numberInputs = wrapper.findAll('input[type="number"]')
-      const tempInput = numberInputs.find((input) => input.attributes('step') === 'any')
+      const tempInput = numberInputs.find((input) => input.attributes('step') === '0.01')
       expect(tempInput).toBeDefined()
     })
   })
@@ -318,8 +336,7 @@ describe('FermentationStepFragment - Inline Editor', () => {
         }
       })
       const numberInputs = wrapper.findAll('input[type="number"]')
-      // temp input uses step="any" so fractional temps (e.g. 0.1 increments) are accepted
-      const stepInput = numberInputs.find((input) => input.attributes('step') === 'any')
+      const stepInput = numberInputs.find((input) => input.attributes('step') === '0.01')
       expect(stepInput).toBeDefined()
     })
   })

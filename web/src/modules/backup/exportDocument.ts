@@ -140,6 +140,9 @@ export interface ExportDevice {
   batchId?: string | null
   vesselId?: string | null
   batchRole?: string | null
+  gravityFormula?: string | null
+  gravityFormulaUnit?: 'sg' | 'plato' | null
+  gravityCalibrationData?: { angle: number; gravity: number }[]
 }
 
 export interface ExportDocument {
@@ -282,6 +285,9 @@ export interface SourceDevice {
   chipFamily?: string | null
   gyroModel?: string | null
   deviceFiltered?: boolean
+  gravityFormula?: string | null
+  gravityFormulaUnit?: 'sg' | 'plato' | null
+  gravityCalibrationData?: { angle: number; gravity: number }[]
 }
 
 function gravityReading(r: SourceGravityReading, chipIdByDeviceId: Map<string, string>): ExportGravityReading {
@@ -500,7 +506,10 @@ export function buildDeviceEntry(device: SourceDevice, mode: ExportMode = 'ml'):
     description: device.description ?? null,
     batchId: device.batchId ?? null,
     vesselId: device.vesselId ?? null,
-    batchRole: device.batchRole ?? null
+    batchRole: device.batchRole ?? null,
+    gravityFormula: device.gravityFormula ?? null,
+    gravityFormulaUnit: device.gravityFormulaUnit ?? null,
+    gravityCalibrationData: device.gravityCalibrationData ?? []
   }
 }
 

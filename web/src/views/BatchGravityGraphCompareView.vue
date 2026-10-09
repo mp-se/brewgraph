@@ -59,6 +59,7 @@ import 'date-fns'
 import 'chartjs-adapter-date-fns'
 import { config, gravityStore, batchStore } from '@/modules/pinia'
 import { gravityToPlato } from '@/modules/utils'
+import { decimalsFor } from '@/modules/useUnitConversion'
 import { logDebug, logError } from '@/ui'
 
 let chart = null // Do not use ref for this, will cause stack overflow...
@@ -320,7 +321,7 @@ function mapGravityData(gList, minTime, maxTime, maxDuration) {
     result.push({
       x: x,
       y: parseFloat(
-        new Number(config.isGravitySG ? g.gravity : gravityToPlato(g.gravity)).toFixed(4)
+        new Number(config.isGravitySG ? g.gravity : gravityToPlato(g.gravity)).toFixed(decimalsFor('gravity'))
       )
     })
   })

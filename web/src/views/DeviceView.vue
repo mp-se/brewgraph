@@ -144,6 +144,7 @@
               <p class="text-subtitle1">Active Fermentation Steps</p>
               <FermentationStepFragment
                 :fermentationSteps="activeFermentationSteps"
+                :tempUnit="config.tempUnit"
                 :editable="false"
               ></FermentationStepFragment>
             </div>
@@ -176,6 +177,18 @@
             </router-link>
           </div>
           <div class="col-md-12 app-button-row">
+            <router-link
+              v-if="!isNew() && isGravityDevice"
+              :to="{ name: 'device-gravity-formula', params: { id: device.id } }"
+            >
+              <app-button
+                type="button"
+                variant="outline-secondary" class="app-width-2"
+                data-testid="gravity-formula-link"
+              >
+                <q-icon name="functions" /> Formula editor
+              </app-button>
+            </router-link>
             <app-button
               v-if="hasDirectDeviceToken"
               type="button"
@@ -274,7 +287,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { global, deviceStore, vesselStore } from '@/modules/pinia'
+import { config, global, deviceStore, vesselStore } from '@/modules/pinia'
 import { storeToRefs } from 'pinia'
 import { validateCurrentForm } from '@/modules/utils'
 import {
@@ -299,6 +312,8 @@ const deviceSaved = ref(null)
 const activeFermentationSteps = ref(null)
 const showValidation = ref(false)
 const isSaving = ref(false)
+const isGravityDevice = computed(() => ['gravitymon', 'ispindel'].includes(device.value?.deviceType) ||
+  (!device.value?.deviceType && !!device.value?.id))
 
 function deviceChanged() {
   logDebug('DeviceView.deviceChanged()')

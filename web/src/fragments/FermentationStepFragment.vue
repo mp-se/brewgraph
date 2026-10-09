@@ -46,8 +46,8 @@
           </td>
           <td>
             <input v-if="editable" type="number" class="app-native-input app-native-input--dense" style="width: 80px"
-              :value="step.temp" step="any" @input="updateStep(index, 'temp', Number($event.target.value))" />
-            <span v-else>{{ step.temp }}</span>
+              :value="displayTemperature(step.temp)" :step="stepFor('temperature')" @input="updateTemperature(index, Number($event.target.value))" />
+            <span v-else>{{ displayTemperature(step.temp) }}</span>
           </td>
           <td>
             <input v-if="editable" type="number" class="app-native-input app-native-input--dense" style="width: 70px"
@@ -70,6 +70,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import { tempToC, tempToF, roundValue } from '@/modules/utils'
+import { decimalsFor, stepFor } from '@/modules/useUnitConversion'
 
 const props = defineProps({
   fermentationSteps: {
@@ -97,6 +99,14 @@ const steps = computed(() => props.fermentationSteps ?? [])
 function updateStep(index, field, value) {
   const updated = steps.value.map((s, i) => (i === index ? { ...s, [field]: value } : s))
   emit('update:fermentationSteps', updated)
+}
+
+function displayTemperature(temp) {
+  return roundValue(props.tempUnit === 'F' ? tempToF(temp) : temp, decimalsFor('temperature'))
+}
+
+function updateTemperature(index, displayedTemp) {
+  updateStep(index, 'temp', props.tempUnit === 'F' ? tempToC(displayedTemp) : displayedTemp)
 }
 
 function removeStep(index) {

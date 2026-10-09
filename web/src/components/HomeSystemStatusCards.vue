@@ -1,6 +1,6 @@
 <!-- Copyright (c) 2024-2026 Magnus Persson SPDX-License-Identifier: GPL-3.0-only -->
 <template>
-  <div class="row q-col-gutter-md q-mt-xs">
+  <div class="row q-col-gutter-md q-mt-md">
     <div class="col-md-4" v-for="(device, index) in chamberTemps" :key="`chamber-${index}`">
       <AppCard v-if="device.error === undefined" :header="'Chamber: ' + device.mdns" color="info" title="">
         <div class="text-center" v-if="device?.pid_fridge_temp_connected">

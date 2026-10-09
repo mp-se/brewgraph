@@ -17,6 +17,7 @@ Current modules:
 - Text truncation and relative/duration time formatting
 - Generic active-reading statistics
 - Gravity telemetry-series transformations
+- Bounded gravity-formula parsing, evaluation, calibration fitting and profile serialization
 - Fermentation payload normalization
 - Fermentation-step parsing, serialization, and scheduling
 
