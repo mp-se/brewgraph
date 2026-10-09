@@ -184,6 +184,8 @@ docker compose up -d
 | `REDIS_HOST` | No | — | Redis hostname (required if `CACHE_ENABLED=true`) |
 | `TRUST_PROXY_HEADERS` | No | `false` | Trust `X-Real-IP` / `X-Forwarded-For` (rightmost entry) from a reverse proxy. Set `true` when behind Nginx. |
 | `TRUSTED_PROXIES` | No | loopback and private ranges | Comma-separated IPs or CIDR ranges whose proxy headers are believed. Headers from any other peer, and values that are not IP addresses, are ignored. Narrow it to your proxy address if you can. |
+| `SSE_MAX_CONNECTIONS_PER_IP` | No | `10` | Concurrent live-update (`/events`) streams allowed per client IP; extra connections get 429. `0` = no limit |
+| `SSE_MAX_CONNECTIONS` | No | `50` | Concurrent live-update streams in total (the API key is shared, so this is also the per-key limit). `0` = no limit |
 | `AUTH_MAX_FAILURES` | No | `10` | Failed auth attempts before IP block |
 | `AUTH_BLOCK_SECONDS` | No | `300` | Seconds an IP stays blocked after too many failures |
 | `BREWFATHER_USER_KEY` | No | — | Brewfather integration user key |
@@ -305,6 +307,7 @@ Do not expose BrewGraph to the public internet. For remote access use a VPN
 |---|---|---|
 | API key in the SPA | The web container injects `API_KEY` into a static `env-config.js` that the browser reads. | The key is a **web-UI credential only**. Any LAN client is already trusted, and without TLS (which most LAN deployments skip) a bootstrap handshake would add no real protection. |
 | Open ingest endpoints | `/ingest/*` requires no API key. | IoT firmware (iSpindel, GravityMon, PressureMon, KegMon…) authenticates with a **per-device token** in the payload; endpoints are per-IP rate-limited and per-device throttled. |
+| Device tokens stored in plaintext | Device tokens are kept readable in the database and shown in the UI. | A token only ties a device's readings to a batch or tap; it grants no access to the API or to other data. The UI has to display it so it can be copied into the device firmware, and a hash could not be shown again. Tokens are 192-bit random values, unique per device, and can be regenerated at any time. |
 | CORS `allow_origins: *` | Wildcard origin with `allow_credentials=false`. | No cookies are used and auth is a bearer header, so a wildcard origin cannot drive cross-site credentialed attacks. Simplifies serving the UI and API from different origins/ports. |
 | Single shared API key | One full-privilege bearer token, no per-user roles. | Single-operator deployment — there are no other users to isolate. |
 | Best-effort rate limiting | Auth brute-force blocking, ingest rate limits, and device throttling require Redis (`CACHE_ENABLED=true`) and no-op if Redis is unavailable. | The API key is a 128-bit `secrets.token_urlsafe` value, so online brute force is infeasible regardless. The limiter is defense-in-depth against device abuse, not the primary control. |
