@@ -188,29 +188,56 @@ def assert_private_url(url: str) -> None:
     resolve_and_pin_private_url(url)
 
 
+def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Parse a header or peer value as an IP address; None when it is not one."""
+    try:
+        return ipaddress.ip_address(value.strip())
+    except ValueError:
+        return None
+
+
+def _is_trusted_proxy(peer: str | None, trusted: str) -> bool:
+    """True when the direct peer address lies in one of the trusted networks."""
+    address = _parse_ip(peer or "")
+    if address is None:
+        return False
+    for entry in trusted.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        try:
+            if address in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            logger.warning("Ignoring invalid TRUSTED_PROXIES entry: %r", entry)
+    return False
+
+
 def get_client_ip(request: Request) -> str:
     """Extract real client IP address from the request.
 
-    Proxy headers are only trusted when TRUST_PROXY_HEADERS=true (default false),
-    which should only be set when the API sits behind the bundled Nginx container.
-    Set TRUST_PROXY_HEADERS=false if the API port is exposed directly.
+    Proxy headers are only trusted when TRUST_PROXY_HEADERS=true (default false)
+    and the direct peer is inside TRUSTED_PROXIES (loopback and private ranges by
+    default). A header value that is not a valid IP address is ignored.
     """
     from core.config import \
         get_settings  # pylint: disable=import-outside-toplevel
-    if get_settings().trust_proxy_headers:
+    settings = get_settings()
+    peer = request.client.host if request.client else None
+    if settings.trust_proxy_headers and _is_trusted_proxy(peer, settings.trusted_proxies):
         # Starlette's Headers is case-insensitive, but normalising here keeps
         # the policy correct for alternate ASGI request implementations too.
         headers = {key.lower(): value for key, value in request.headers.items()}
         if "x-real-ip" in headers:
-            real_ip = headers["x-real-ip"].strip()
+            real_ip = _parse_ip(headers["x-real-ip"])
             if real_ip:
-                return real_ip
+                return str(real_ip)
         if "x-forwarded-for" in headers:
             # Use the rightmost entry — it's set by the trusted proxy.
             # The leftmost entry is attacker-controlled in multi-hop deployments.
-            client_ip = headers["x-forwarded-for"].split(",")[-1].strip()
+            client_ip = _parse_ip(headers["x-forwarded-for"].split(",")[-1])
             if client_ip:
-                return client_ip
+                return str(client_ip)
 
     if request.client:
         return request.client.host

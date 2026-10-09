@@ -29,6 +29,8 @@ class TestGetClientIp:
         """Patch settings to trust proxy headers for all tests in this class."""
         with patch("core.config.get_settings") as mock_settings:
             mock_settings.return_value.trust_proxy_headers = True
+            mock_settings.return_value.trusted_proxies = (
+                "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7")
             yield
 
     def test_x_real_ip_takes_priority(self):
@@ -70,6 +72,57 @@ class TestGetClientIp:
         """Returns 'unknown' when there are no headers and no client."""
         req = _request({}, client_host=None)
         assert get_client_ip(req) == "unknown"
+
+
+class TestTrustedProxies:
+    """Proxy headers are believed only from a trusted direct peer, and only if valid IPs."""
+
+    @pytest.fixture(autouse=True)
+    def trust_proxy(self):
+        """Trust proxy headers, with the default trusted networks."""
+        with patch("core.config.get_settings") as mock_settings:
+            mock_settings.return_value.trust_proxy_headers = True
+            mock_settings.return_value.trusted_proxies = (
+                "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7")
+            self.settings = mock_settings.return_value
+            yield
+
+    @pytest.mark.parametrize("peer", ["127.0.0.1", "::1", "10.1.2.3", "172.16.0.5",
+                                      "172.31.255.1", "192.168.1.9", "fd12::1"])
+    def test_private_peer_is_trusted(self, peer):
+        """Loopback and private-range peers have their headers believed."""
+        assert get_client_ip(_request({"x-real-ip": "8.8.8.8"}, peer)) == "8.8.8.8"
+
+    @pytest.mark.parametrize("peer", ["8.8.4.4", "172.32.0.1", "172.15.0.1", "2001:db8::1"])
+    def test_public_peer_headers_ignored(self, peer):
+        """A spoofed header from a non-proxy peer is ignored; the peer address is used."""
+        req = _request({"x-real-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2"}, peer)
+        assert get_client_ip(req) == peer
+
+    def test_no_peer_headers_ignored(self):
+        """Without a direct peer address the headers are not trusted."""
+        assert get_client_ip(_request({"x-real-ip": "1.1.1.1"}, None)) == "unknown"
+
+    def test_invalid_real_ip_falls_to_forwarded_for(self):
+        """A non-IP X-Real-IP is ignored."""
+        req = _request({"x-real-ip": "not-an-ip", "x-forwarded-for": "3.3.3.3"}, "10.0.0.1")
+        assert get_client_ip(req) == "3.3.3.3"
+
+    def test_invalid_headers_fall_back_to_peer(self):
+        """Garbage in both headers yields the peer address."""
+        req = _request({"x-real-ip": "x", "x-forwarded-for": "1.1.1.1, <script>"}, "10.0.0.1")
+        assert get_client_ip(req) == "10.0.0.1"
+
+    def test_custom_trusted_proxies(self):
+        """TRUSTED_PROXIES narrows trust to the configured addresses."""
+        self.settings.trusted_proxies = "10.0.0.2"
+        assert get_client_ip(_request({"x-real-ip": "9.9.9.9"}, "10.0.0.3")) == "10.0.0.3"
+        assert get_client_ip(_request({"x-real-ip": "9.9.9.9"}, "10.0.0.2")) == "9.9.9.9"
+
+    def test_invalid_entry_ignored(self):
+        """A malformed TRUSTED_PROXIES entry is skipped, not fatal."""
+        self.settings.trusted_proxies = "bogus,10.0.0.0/8"
+        assert get_client_ip(_request({"x-real-ip": "9.9.9.9"}, "10.0.0.3")) == "9.9.9.9"
 
 
 class TestTruncateIp:

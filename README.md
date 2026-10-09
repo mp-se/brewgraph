@@ -145,11 +145,11 @@ docker compose up -d
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | SQLAlchemy URL for the PostgreSQL database. Set automatically by `docker-compose.yaml` |
 | `API_KEY` | Yes | — | Bearer token for authenticated UI and management API requests; ingest endpoints use per-device tokens |
-| `API_KEY_ENABLED` | No | `true` | Set `false` to disable auth (dev only) |
 | `SCHEDULER_ENABLED` | No | `true` | Enable background jobs |
 | `CACHE_ENABLED` | No | `true` | Enable Redis cache |
 | `REDIS_HOST` | No | — | Redis hostname (required if `CACHE_ENABLED=true`) |
-| `TRUST_PROXY_HEADERS` | No | `false` | Trust `X-Real-IP` from a reverse proxy. Set `true` when behind Nginx. |
+| `TRUST_PROXY_HEADERS` | No | `false` | Trust `X-Real-IP` / `X-Forwarded-For` (rightmost entry) from a reverse proxy. Set `true` when behind Nginx. |
+| `TRUSTED_PROXIES` | No | loopback and private ranges | Comma-separated IPs or CIDR ranges whose proxy headers are believed. Headers from any other peer, and values that are not IP addresses, are ignored. Narrow it to your proxy address if you can. |
 | `AUTH_MAX_FAILURES` | No | `10` | Failed auth attempts before IP block |
 | `AUTH_BLOCK_SECONDS` | No | `300` | Seconds an IP stays blocked after too many failures |
 | `BREWFATHER_USER_KEY` | No | — | Brewfather integration user key |
@@ -235,7 +235,7 @@ docker compose up -d
 ```bash
 cd api
 make install-test   # install deps including test extras
-make run            # dev server on :8080 (SQLite, auth disabled)
+make run            # dev server on :8080 (SQLite, API key "devkey")
 make test           # run test suite
 make lint           # pylint
 make fmt            # autoformat
@@ -246,7 +246,7 @@ make fmt            # autoformat
 ```bash
 cd web
 npm install
-npm run dev         # dev server on :5173 (proxies API to localhost:8080)
+VITE_APP_TOKEN=devkey npm run dev   # dev server on :5173 (proxies API to localhost:8080)
 npm run test        # Vitest unit tests
 npm run lint        # ESLint
 ```
@@ -287,7 +287,6 @@ Do not expose BrewGraph to the public internet. For remote access use a VPN
 | CORS `allow_origins: *` | Wildcard origin with `allow_credentials=false`. | No cookies are used and auth is a bearer header, so a wildcard origin cannot drive cross-site credentialed attacks. Simplifies serving the UI and API from different origins/ports. |
 | Single shared API key | One full-privilege bearer token, no per-user roles. | Single-operator deployment — there are no other users to isolate. |
 | Best-effort rate limiting | Auth brute-force blocking, ingest rate limits, and device throttling require Redis (`CACHE_ENABLED=true`) and no-op if Redis is unavailable. | The API key is a 128-bit `secrets.token_urlsafe` value, so online brute force is infeasible regardless. The limiter is defense-in-depth against device abuse, not the primary control. |
-| `API_KEY_ENABLED=false` | Auth can be disabled entirely. | Local development only — never set this in a real deployment. |
 | `proxy_fetch` reaches LAN hosts | The authenticated UI can proxy requests to private (RFC1918) IPs; cloud-metadata, loopback, and link-local targets are blocked, and the resolved IP is pinned against DNS rebinding. | Configuring physical devices on the LAN is the intended feature, and the caller is already the trusted operator. |
 
 ### Still enforced (do not weaken)

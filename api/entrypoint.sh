@@ -8,7 +8,6 @@ u = urlparse('${DATABASE_URL:-sqlite:////data/brewgraph.sqlite}')
 print(f'{u.scheme}://***@{u.hostname}{u.path}' if u.password else u.geturl())
 " 2>/dev/null || echo "(unable to parse)")
 echo "Database: ${DB_DISPLAY}"
-echo "API key auth enabled: ${API_KEY_ENABLED:-true}"
 echo "Scheduler enabled: ${SCHEDULER_ENABLED:-true}"
 echo "Cache enabled: ${CACHE_ENABLED:-false}"
 

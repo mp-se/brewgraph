@@ -22,12 +22,12 @@ def _request(headers=None, client_host="10.0.0.1"):
     return req
 
 
-def _settings(api_key="testkey", enabled=True, trust_proxy=False,
+def _settings(api_key="testkey", trust_proxy=False,
               max_failures=5, block_seconds=300):
     s = MagicMock()
     s.api_key = SecretStr(api_key)
-    s.api_key_enabled = enabled
     s.trust_proxy_headers = trust_proxy
+    s.trusted_proxies = "127.0.0.0/8,10.0.0.0/8,192.168.0.0/16"
     s.auth_max_failures = max_failures
     s.auth_block_seconds = block_seconds
     return s
@@ -82,7 +82,7 @@ class TestGetClientIp:
         # Rightmost entry is used: it's the IP appended by the trusted proxy
         # (nginx sets X-Forwarded-For from $remote_addr, appending the real client).
         # Taking [-1] prevents spoofing via a client-injected leading entry.
-        req = _request(headers={"X-Forwarded-For": "spoofed_ip, 5.6.7.8"})
+        req = _request(headers={"X-Forwarded-For": "6.6.6.6, 5.6.7.8"}, client_host="10.0.0.1")
         with patch("core.config.get_settings") as mock_cfg:
             mock_cfg.return_value = _settings(trust_proxy=True)
             assert _get_client_ip(req) == "5.6.7.8"
@@ -100,22 +100,6 @@ class TestGetClientIp:
         with patch("core.config.get_settings") as mock_cfg:
             mock_cfg.return_value = _settings(trust_proxy=True)
             assert _get_client_ip(req) == "192.168.1.1"
-
-
-# ---------------------------------------------------------------------------
-# api_key_auth — disabled path
-# ---------------------------------------------------------------------------
-
-class TestApiKeyAuthDisabled:
-    """Tests for api_key_auth when auth is disabled."""
-
-    def test_disabled_always_returns_auth_context(self):
-        """Returns a valid AuthContext for any key when auth is disabled."""
-        req = _request()
-        with patch("core.middleware.auth.get_settings") as mock_cfg:
-            mock_cfg.return_value = _settings(enabled=False)
-            ctx = api_key_auth(req, api_key="anything")
-        assert ctx is not None
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +155,45 @@ class TestApiKeyAuthFailures:
             with pytest.raises(HTTPException) as exc:
                 api_key_auth(req, api_key="bad")
         assert exc.value.status_code == 429
+
+
+class TestBruteForceBlock:
+    """A block holds against the correct key, and a block does not reset the counter."""
+
+    def test_blocked_ip_with_correct_key_still_refused(self):
+        """The correct key from a blocked IP is refused, so a block cannot be probed."""
+        req = _request()
+        with patch("core.middleware.auth.get_settings") as mock_cfg, \
+             patch("core.middleware.auth.exist_key", return_value=True), \
+             patch("core.middleware.auth.delete_key") as deleted:
+            mock_cfg.return_value = _settings(api_key="testkey")
+            with pytest.raises(HTTPException) as exc:
+                api_key_auth(req, api_key="testkey")
+        assert exc.value.status_code == 429
+        deleted.assert_not_called()
+
+    def test_blocking_does_not_clear_failure_counter(self):
+        """Only a successful authentication clears the counter, not the block itself."""
+        req = _request()
+        with patch("core.middleware.auth.get_settings") as mock_cfg, \
+             patch("core.middleware.auth.exist_key", return_value=False), \
+             patch("core.middleware.auth.increment_key", return_value=5), \
+             patch("core.middleware.auth.delete_key") as deleted, \
+             patch("core.middleware.auth.system_log_security"):
+            mock_cfg.return_value = _settings(max_failures=5)
+            with pytest.raises(HTTPException):
+                api_key_auth(req, api_key="bad")
+        deleted.assert_not_called()
+
+    def test_success_clears_failure_counter(self):
+        """A correct key from an unblocked IP clears its failure counter."""
+        req = _request()
+        with patch("core.middleware.auth.get_settings") as mock_cfg, \
+             patch("core.middleware.auth.exist_key", return_value=False), \
+             patch("core.middleware.auth.delete_key") as deleted:
+            mock_cfg.return_value = _settings(api_key="testkey")
+            api_key_auth(req, api_key="testkey")
+        deleted.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

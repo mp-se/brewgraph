@@ -36,7 +36,6 @@ format:
 run:
 	DATABASE_URL=sqlite:///./brewgraph.sqlite \
 	API_KEY=devkey \
-	API_KEY_ENABLED=false \
 	SCHEDULER_ENABLED=false \
 	CACHE_ENABLED=false \
 	uvicorn main_oss:app --reload --host 0.0.0.0 --port 8080

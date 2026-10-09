@@ -153,66 +153,64 @@ def api_key_auth(request: Request, api_key: Optional[str] = Depends(_bearer_toke
     """Validate API key and return an AuthContext for the request.
 
     Raises:
-        HTTPException: If API key is invalid and key validation is enabled.
+        HTTPException: If the API key is missing or invalid, or the client is blocked.
     """
     settings = get_settings()
-    if settings.api_key_enabled:
-        client_ip = _get_client_ip(request)
-        block_key = f"auth:blocked:{client_ip}"
-        fail_key = f"auth:failures:{client_ip}"
+    client_ip = _get_client_ip(request)
+    block_key = f"auth:blocked:{client_ip}"
+    fail_key = f"auth:failures:{client_ip}"
 
-        logger.info("Validating access token")
-        if hmac.compare_digest(api_key or "", settings.api_key.get_secret_value()):
-            delete_key(fail_key)
-            return AuthContext()
+    # A blocked client is refused before its key is looked at, so a block cannot be
+    # probed with further guesses.
+    if exist_key(block_key):
+        logger.warning("Blocked IP attempted access: %s", truncate_ip(client_ip))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed authentication attempts",
+            headers=retry_after_headers(
+                block_key, fallback=settings.auth_block_seconds
+            ),
+        )
 
-        if exist_key(block_key):
-            logger.warning("Blocked IP attempted access: %s", truncate_ip(client_ip))
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed authentication attempts",
-                headers=retry_after_headers(
-                    block_key, fallback=settings.auth_block_seconds
-                ),
-            )
+    logger.info("Validating access token")
+    if hmac.compare_digest(api_key or "", settings.api_key.get_secret_value()):
+        delete_key(fail_key)
+        return AuthContext()
 
-        path = request.url.path
-        token_present = "present" if api_key else "missing"
+    path = request.url.path
+    token_present = "present" if api_key else "missing"
 
-        failures = increment_key(fail_key, settings.auth_block_seconds)
+    failures = increment_key(fail_key, settings.auth_block_seconds)
 
-        if failures >= settings.auth_max_failures:
-            increment_key(block_key, settings.auth_block_seconds)
-            delete_key(fail_key)
-            system_log_security(
-                f"IP {truncate_ip(client_ip)} blocked after {failures} failed auth attempts",
-                level="WARNING",
-            )
-            logger.warning("IP blocked due to repeated auth failures: %s", truncate_ip(client_ip))
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed authentication attempts",
-                headers=retry_after_headers(
-                    block_key, fallback=settings.auth_block_seconds
-                ),
-            )
-
+    if failures >= settings.auth_max_failures:
+        increment_key(block_key, settings.auth_block_seconds)
         system_log_security(
-            f"Invalid token in request from {truncate_ip(client_ip)} on {path}"
-            f" (token: {token_present})"
-            f" — failure {failures}/{settings.auth_max_failures}",
+            f"IP {truncate_ip(client_ip)} blocked after {failures} failed auth attempts",
             level="WARNING",
         )
-        logger.error(
-            "Api-key is not valid: client=%s path=%s token=%s failures=%d",
-            truncate_ip(client_ip), path, token_present, failures,
-        )
+        logger.warning("IP blocked due to repeated auth failures: %s", truncate_ip(client_ip))
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access forbidden",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed authentication attempts",
+            headers=retry_after_headers(
+                block_key, fallback=settings.auth_block_seconds
+            ),
         )
-    logger.info("Access token validation is disabled in configuration")
-    return AuthContext()
+
+    system_log_security(
+        f"Invalid token in request from {truncate_ip(client_ip)} on {path}"
+        f" (token: {token_present})"
+        f" — failure {failures}/{settings.auth_max_failures}",
+        level="WARNING",
+    )
+    logger.error(
+        "Api-key is not valid: client=%s path=%s token=%s failures=%d",
+        truncate_ip(client_ip), path, token_present, failures,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Access forbidden",
+    )
 
 
 def record_auth_failure(client_ip: str) -> None:

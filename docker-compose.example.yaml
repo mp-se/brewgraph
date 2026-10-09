@@ -34,11 +34,10 @@ services:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting BrewGraph}@brewgraph-db:5432/brewgraph
       # Required: must match the web and sidecar credentials.
       - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
-      - API_KEY_ENABLED=true
       - SCHEDULER_ENABLED=true
       - CACHE_ENABLED=true
       - REDIS_HOST=brewgraph-redis
-      - TRUST_PROXY_HEADERS=true  # Safe here because nginx sets X-Real-IP from $remote_addr
+      - TRUST_PROXY_HEADERS=true  # Safe here: nginx sets X-Real-IP from $remote_addr; only private-range peers are believed (TRUSTED_PROXIES)
       - BREWFATHER_USER_KEY=${BREWFATHER_USER_KEY:-}
       - BREWFATHER_API_KEY=${BREWFATHER_API_KEY:-}
       # - BREWERS_FRIEND_USER_KEY=${BREWERS_FRIEND_USER_KEY:-} # Future integration not yet implemented

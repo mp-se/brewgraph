@@ -47,7 +47,7 @@ if get_settings().cache_enabled:
         host=get_settings().redis_host,
         port=6379,
         db=0,
-        password=get_settings().redis_password or None,
+        password=get_settings().redis_password.get_secret_value() or None,
     )
 
 

@@ -25,7 +25,7 @@ from core.models import \
 
 logger = logging.getLogger(__name__)
 
-db_url = get_settings().database_url
+db_url = get_settings().database_url.get_secret_value()
 
 if db_url.startswith("sqlite:"):
     logger.info("Creating database engine for SQLite.")

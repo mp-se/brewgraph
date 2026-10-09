@@ -31,8 +31,7 @@ class Settings(BaseSettings):
     app_name: str = "BrewGraph API"
     redis_host: str = config("REDIS_HOST", cast=str, default="localhost")
     # Optional Redis AUTH password; empty (default) connects without auth.
-    redis_password: str = config("REDIS_PASSWORD", cast=str, default="")
-    api_key_enabled: bool = config("API_KEY_ENABLED", cast=bool, default=True)
+    redis_password: SecretStr = config("REDIS_PASSWORD", cast=str, default="")
     scheduler_enabled: bool = config("SCHEDULER_ENABLED", cast=bool, default=True)
     cache_enabled: bool = config("CACHE_ENABLED", cast=bool, default=True)
     # Defaults to False: only set True when the API sits behind the bundled nginx
@@ -40,6 +39,12 @@ class Settings(BaseSettings):
     # Leaving it True when the API port is exposed directly lets callers spoof
     # their IP and bypass the auth brute-force rate limiter.
     trust_proxy_headers: bool = config("TRUST_PROXY_HEADERS", cast=bool, default=False)
+    # Peers whose X-Real-IP / X-Forwarded-For are believed when TRUST_PROXY_HEADERS is on:
+    # comma-separated IPs or CIDR ranges. Default: loopback and the private ranges.
+    trusted_proxies: str = config(
+        "TRUSTED_PROXIES", cast=str,
+        default="127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7",
+    )
     auth_max_failures: int = config("AUTH_MAX_FAILURES", cast=int, default=10)
     auth_block_seconds: int = config("AUTH_BLOCK_SECONDS", cast=int, default=300)
     # Grace period, in days, before a soft-deleted row (deleted_at set) is
@@ -55,7 +60,6 @@ class Settings(BaseSettings):
 
     logger.info("redis_host: %s", redis_host)
     logger.info("redis_password: %s", "set" if redis_password else "not set")
-    logger.info("api_key_enabled: %s", api_key_enabled)
     logger.info("scheduler_enabled: %s", scheduler_enabled)
     logger.info("cache_enabled: %s", cache_enabled)
     logger.info("trust_proxy_headers: %s", trust_proxy_headers)
@@ -65,7 +69,7 @@ class Settings(BaseSettings):
     logger.info("max_envelope_bytes: %s", max_envelope_bytes)
 
     # Secrets and API keys (dont print to logs)
-    database_url: str = config(
+    database_url: SecretStr = config(
         "DATABASE_URL", cast=str, default="sqlite:///./brewgraph.sqlite"
     )
     api_key: SecretStr = config("API_KEY", cast=str, default=generate_api_key(20))
