@@ -10,6 +10,40 @@ Runs entirely on your local network via Docker Compose. No cloud account require
 
 ---
 
+## Contents
+
+- [Supported devices](#supported-devices)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Quick start — pre-built images](#quick-start--pre-built-images)
+- [Optional services](#optional-services)
+- [Quick start — build from source](#quick-start--build-from-source)
+- [Services](#services)
+- [Environment variables](#environment-variables)
+- [HTTPS (optional)](#https-optional)
+- [Updating](#updating)
+- [Development](#development)
+- [Security model & accepted tradeoffs](#security-model--accepted-tradeoffs)
+- [License](#license)
+
+---
+
+## Supported devices
+
+| Device | Protocol | Ingest endpoint | Firmware |
+|---|---|---|---|
+| [iSpindel](https://github.com/universam1/ispindel) | HTTP | `/ingest/ispindel` | Any version |
+| [GravityMon](https://github.com/mp-se/gravitymon) | HTTP / BLE | `/ingest/gravitymon` | Any version |
+| [GravityMon Gateway](https://github.com/mp-se/gravitymon-gateway) | HTTP | `/ingest/gravitymon` | Any version |
+| [PressureMon](https://github.com/mp-se/pressuremon) | HTTP / BLE | `/ingest/pressuremon` | Any version |
+| KegMon | HTTP | `/ingest/kegmon` | Integration in development, not yet released |
+| ChamberCtl | HTTP / BLE | `/ingest/chamber` | Integration in development, not yet released |
+
+Where a device type has no released firmware yet, the ingest endpoint is in place but has not been
+verified against released firmware.
+
+---
+
 ## Features
 
 - Ingest gravity and temperature readings from iSpindel-compatible devices over HTTP
@@ -250,19 +284,6 @@ VITE_APP_TOKEN=devkey npm run dev   # dev server on :5173 (proxies API to localh
 npm run test        # Vitest unit tests
 npm run lint        # ESLint
 ```
-
----
-
-## Supported devices
-
-| Device | Protocol | Ingest endpoint |
-|---|---|---|
-| iSpindel | HTTP | `/ingest/ispindel` |
-| GravityMon | HTTP / BLE | `/ingest/gravitymon` |
-| GravityMon Gateway | HTTP | `/ingest/gravitymon` |
-| PressureMon | HTTP / BLE | `/ingest/pressuremon` |
-| KegMon | HTTP | `/ingest/kegmon` |
-| ChamberCtl | HTTP / BLE | `/ingest/chamber` |
 
 ---
 
