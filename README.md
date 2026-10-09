@@ -4,6 +4,8 @@ Self-hosted homebrewing telemetry platform. Ingests gravity and pressure reading
 
 Runs entirely on your local network via Docker Compose. No cloud account required.
 
+**Website:** [www.brewgraph.com](https://www.brewgraph.com) · **Documentation:** [www.brewgraph.com/docs](https://www.brewgraph.com/docs)
+
 > **Note:** BrewGraph is the successor to [BrewLogger](https://github.com/mp-se/brewlogger). The brewlogger.com domain was already taken, so the project was renamed and rebuilt as BrewGraph. Existing BrewLogger backups can be imported directly via the restore feature. BrewGraph can be seen as BrewLogger v2.0 since it has a new datamodel and new features.
 
 > **Security notice:** BrewGraph is designed for trusted LAN deployment only. The shared API key authenticates the **web UI** and is delivered to the browser in a static file; IoT devices do not use it — they post to the open ingest endpoints with their own per-device tokens. Do not expose BrewGraph to the public internet. If remote access is needed, use a VPN (WireGuard, Tailscale) or a reverse proxy with its own auth layer. See [Security model & accepted tradeoffs](#security-model--accepted-tradeoffs) for the full threat model.
