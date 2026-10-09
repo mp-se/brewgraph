@@ -45,20 +45,13 @@ class FermentationCompletionPredictor:
     Matches the logic used in the ESP32 C++ implementation and training pipeline.
     """
 
-    def __init__(self, model_path=None, scaler_path=None, metadata_path=None):
+    def __init__(self):
+        # The model files are executable pickles, so the paths are not configurable:
+        # only the reviewed assets in the bundled directory are ever loaded.
         assets = Path(__file__).resolve().parent / 'fermentation_completion'
-
-        self.model_path = (
-            Path(model_path) if model_path else assets / 'fermentation_completion.pkl'
-        )
-        self.scaler_path = (
-            Path(scaler_path) if scaler_path else assets / 'fermentation_completion_scaler.pkl'
-        )
-        self.metadata_path = (
-            Path(metadata_path)
-            if metadata_path
-            else assets / 'fermentation_completion_metadata.json'
-        )
+        self.model_path = assets / 'fermentation_completion.pkl'
+        self.scaler_path = assets / 'fermentation_completion_scaler.pkl'
+        self.metadata_path = assets / 'fermentation_completion_metadata.json'
 
         self.model = None
         self.scaler = None
@@ -67,36 +60,34 @@ class FermentationCompletionPredictor:
         self._load_assets()
 
     @staticmethod
-    def _verify_bundled_asset(path: Path) -> None:
-        """Reject a changed bundled model asset before opening executable pickle.
+    def _read_verified(path: Path) -> bytes:
+        """Return a model asset's bytes, only if it is a reviewed, unmodified bundled file.
 
-        Known production asset names are always checked, including when tests or an
-        operator provide an alternate path with one of those names.  An explicitly
-        named third-party model is outside this bundled-asset contract.
+        The digest is checked on the same bytes that are then deserialized, so the file
+        cannot change between the check and the load. A file whose name is not in the
+        reviewed digest list is rejected, not skipped, so a pickle cannot get past the
+        check by being given a different name.
         """
         expected = _BUNDLED_ASSET_SHA256.get(path.name)
         if expected is None:
-            return
-        with path.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        if not hmac.compare_digest(digest, expected):
+            raise ValueError(f"Model asset is not a reviewed bundled file: {path.name}")
+        data = path.read_bytes()
+        if not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected):
             raise ValueError(f"Model asset integrity check failed: {path.name}")
+        return data
+
+    @classmethod
+    def _verify_bundled_asset(cls, path: Path) -> None:
+        """Raise ValueError unless *path* is a reviewed, unmodified bundled asset."""
+        cls._read_verified(path)
 
     def _load_assets(self):
         """Load the trained model, scaler, and metadata."""
         try:
-            self._verify_bundled_asset(self.model_path)
-            self._verify_bundled_asset(self.scaler_path)
-            self._verify_bundled_asset(self.metadata_path)
-            with open(self.model_path, 'rb') as f:
-                self.model = pickle.load(f)
-
-            with open(self.scaler_path, 'rb') as f:
-                self.scaler = pickle.load(f)
-
-            with open(self.metadata_path, 'r', encoding='utf-8') as f:
-                self.metadata = json.load(f)
-
+            self.model = pickle.loads(self._read_verified(self.model_path))  # nosec B301
+            self.scaler = pickle.loads(self._read_verified(self.scaler_path))  # nosec B301
+            self.metadata = json.loads(
+                self._read_verified(self.metadata_path).decode('utf-8'))
             logger.info("Loaded fermentation model from %s", self.model_path.name)
         except Exception as exc:
             logger.error("Error loading fermentation model assets: %s", exc)

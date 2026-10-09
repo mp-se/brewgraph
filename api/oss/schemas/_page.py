@@ -9,6 +9,7 @@
 
 """Shared pagination envelope schemas."""
 import math
+import uuid
 from datetime import datetime
 from typing import Generic, List, Optional, Tuple, TypeVar
 
@@ -68,6 +69,19 @@ def encode_cursor(created_at: datetime, row_id) -> str:
     return f"{created_at.isoformat()}|{row_id}"
 
 
+def _validate_cursor_id(id_part: str) -> None:
+    """Reject a cursor id that is neither a bounded integer nor a UUID.
+
+    Every cursor-paginated model keys on one or the other; checking here keeps a
+    malformed id a ValueError (mapped to 400) instead of failing later in the query.
+    """
+    if id_part.isascii() and id_part.isdigit():
+        if int(id_part) > 2 ** 63 - 1:
+            raise ValueError("Cursor id out of range")
+        return
+    uuid.UUID(id_part)
+
+
 def parse_cursor(cursor: Optional[str]) -> Optional[Tuple[datetime, str]]:
     """Parse a cursor emitted by `encode_cursor` back into `(created_at, id_str)`.
 
@@ -90,6 +104,7 @@ def parse_cursor(cursor: Optional[str]) -> Optional[Tuple[datetime, str]]:
     ts_part, id_part = text.rsplit("|", 1)
     if not id_part:
         raise ValueError("Cursor missing id component")
+    _validate_cursor_id(id_part)
     tail = ts_part[-6:]
     if tail.startswith(" ") and tail[1:].replace(":", "").isdigit():
         ts_part = ts_part[:-6] + "+" + tail[1:]

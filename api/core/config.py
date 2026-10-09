@@ -45,6 +45,10 @@ class Settings(BaseSettings):
         "TRUSTED_PROXIES", cast=str,
         default="127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7",
     )
+    # Concurrent /events (SSE) connections: per client IP, and in total. The API key is
+    # shared, so the total is also the per-key limit. 0 disables a limit.
+    sse_max_connections_per_ip: int = config("SSE_MAX_CONNECTIONS_PER_IP", cast=int, default=10)
+    sse_max_connections: int = config("SSE_MAX_CONNECTIONS", cast=int, default=50)
     auth_max_failures: int = config("AUTH_MAX_FAILURES", cast=int, default=10)
     auth_block_seconds: int = config("AUTH_BLOCK_SECONDS", cast=int, default=300)
     # Grace period, in days, before a soft-deleted row (deleted_at set) is

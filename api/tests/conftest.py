@@ -95,10 +95,11 @@ def truncate_database():
         ("device", "vessel_id"),
         ("tap", "device_id"),
     ]
+    quote = engine.dialect.identifier_preparer.quote
     with engine.connect() as con:
         for table, column in cycle_breakers:
             try:
-                con.execute(text(f"UPDATE {table} SET {column} = NULL"))
+                con.execute(text(f"UPDATE {quote(table)} SET {quote(column)} = NULL"))
                 con.commit()
             except SQLAlchemyError as e:
                 con.rollback()
@@ -131,7 +132,7 @@ def truncate_database():
     with engine.connect() as con:
         for table in tables:
             try:
-                con.execute(text(f"DELETE FROM {table}"))
+                con.execute(text(f"DELETE FROM {quote(table)}"))
                 con.commit()
             except SQLAlchemyError as e:
                 con.rollback()
