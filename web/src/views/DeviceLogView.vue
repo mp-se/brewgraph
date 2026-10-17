@@ -312,7 +312,8 @@ async function updateDeviceLogList() {
   }
 }
 
-defineExpose({ deviceSelected, deviceOptions })
+// Expose reactive view state used by the component's unit tests and page harness.
+defineExpose({ deviceSelected, deviceOptions, deviceLog })
 </script>
 
 <style scoped>

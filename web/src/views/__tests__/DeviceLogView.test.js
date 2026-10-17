@@ -542,6 +542,7 @@ describe('DeviceLogView - Device Logs View', () => {
   describe('Log Display', () => {
     it('should display log lines when available', async () => {
       wrapper = mountComponent()
+      await flushPromises()
       wrapper.vm.deviceLog = ['Log line 1', 'Log line 2']
       await wrapper.vm.$nextTick()
       expect(wrapper.vm.deviceLog.length).toBe(2)
@@ -554,7 +555,9 @@ describe('DeviceLogView - Device Logs View', () => {
 
     it('should display log statistics', async () => {
       wrapper = mountComponent()
+      await flushPromises()
       wrapper.vm.deviceSelected = 'CHIP1'
+      await flushPromises()
       wrapper.vm.deviceLog = ['Line 1', 'Line 2', 'Line 3']
       await wrapper.vm.$nextTick()
       expect(wrapper.vm.deviceLog.length).toBe(3)
@@ -1149,6 +1152,7 @@ describe('DeviceLogView - Device Logs View', () => {
 
     it('should only display logs when log array is not empty', async () => {
       wrapper = mountComponent()
+      await flushPromises()
       expect(wrapper.vm.deviceLog.length).toBe(0)
 
       wrapper.vm.deviceLog = ['Log line 1', 'Log line 2']
