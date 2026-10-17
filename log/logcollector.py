@@ -27,6 +27,7 @@ Required env vars:
 Optional env vars:
 - REDIS_HOST: Redis hostname for status sharing
 - MAX_FILE_SIZE: Maximum log file size in bytes before rotation
+- MAX_LOG_FILES: Total retained log files per device, including the active file
 """
 import asyncio
 import logging
@@ -50,7 +51,8 @@ logger = logging.getLogger(__name__)
 endpoint = ""
 headers = {}
 threads = {}
-max_file_size = 100000
+max_file_size = 1048576
+max_log_files = 5
 pool = None
 
 
@@ -121,13 +123,18 @@ def websocket_collector(url, chip_id):
 
                     if os.stat(file_name).st_size > max_file_size:
                         logger.info(
-                            "Log file too large (>%d), rotating %s → %s.1",
-                            max_file_size, file_name, file_name,
+                            "Log file too large (>%d), rotating %s (%d files retained)",
+                            max_file_size, file_name, max_log_files,
                         )
                         try:
-                            os.remove(file_name + ".1")
+                            os.remove(file_name + f".{max_log_files - 1}")
                         except OSError:
                             pass
+                        for generation in range(max_log_files - 2, 0, -1):
+                            try:
+                                os.rename(file_name + f".{generation}", file_name + f".{generation + 1}")
+                            except OSError:
+                                pass
                         os.rename(file_name, file_name + ".1")
 
                 # Graceful shutdown check
@@ -236,9 +243,15 @@ if __name__ == "__main__":
     api_host = os.getenv("API_HOST")
     api_key = os.getenv("API_KEY")
     max_file_size_env = os.getenv("MAX_FILE_SIZE")
+    max_log_files_env = os.getenv("MAX_LOG_FILES")
 
     if max_file_size_env is not None:
         max_file_size = int(max_file_size_env)
+    if max_log_files_env is not None:
+        max_log_files = int(max_log_files_env)
+    if max_log_files < 2:
+        logging.error("MAX_LOG_FILES must be at least 2.")
+        raise SystemExit(1)
 
     if api_host is None or api_key is None:
         logging.error("API_HOST and API_KEY environment variables must be set.")
@@ -251,8 +264,8 @@ if __name__ == "__main__":
     }
 
     logger.info(
-        "Starting BrewGraph log collector — max file size %d KB",
-        max_file_size // 1000,
+        "Starting BrewGraph log collector — max file size %d KB, %d files per device",
+        max_file_size // 1000, max_log_files,
     )
     asyncio.run(main())
     logger.info("Exiting...")

@@ -112,7 +112,8 @@ services:
       - API_HOST=brewgraph-api
       - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
       - REDIS_HOST=brewgraph-redis
-      - MAX_FILE_SIZE=100000
+      - MAX_FILE_SIZE=1048576
+      - MAX_LOG_FILES=5
     networks:
       - brewgraph-net
     volumes:

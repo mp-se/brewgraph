@@ -91,6 +91,16 @@
         >
           <q-icon name="subdirectory_arrow_right" />
         </app-button>
+        <app-button
+          @click="loadOlderLogs()"
+          type="button"
+          variant="secondary"
+          :disabled="deviceSelected == '' || !canLoadOlder"
+          title="Load an older chunk of this device's logs"
+          aria-label="Load older logs"
+        >
+          Load older
+        </app-button>
       </div>
     </div>
     <hr />
@@ -130,6 +140,8 @@ const deviceSelected = ref('')
 const deviceOptions = ref([])
 const deviceLog = ref([])
 const logStatusData = ref({})
+const canLoadOlder = ref(false)
+const nextLogChunk = ref({ generation: 0, before: 0 })
 
 const logStatusLast = computed(() => {
   if (deviceSelected.value in logStatusData.value)
@@ -198,25 +210,37 @@ async function deleteLogs() {
 async function fetchLogs() {
   if (deviceSelected.value == '') {
     deviceLog.value = []
+    canLoadOlder.value = false
     return
   }
 
+  deviceLog.value = []
+  nextLogChunk.value = { generation: 0, before: 0 }
+  canLoadOlder.value = true
+  await loadOlderLogs()
+}
+
+async function loadOlderLogs() {
+  if (deviceSelected.value == '' || !canLoadOlder.value) return
+
   const releaseBusy = global.acquireBusy()
   try {
-    const res = await apiFetch('GET', 'devices/logs/' + deviceSelected.value)
-    logDebug('DeviceLogView.fetchLogs()', res.status)
-    if (!res.ok) throw res
-    deviceLog.value = (await res.text()).split('\n')
-
-    // Try to load the .1 file if this exists; the active log still renders if it does not.
-    try {
-      const rotated = await apiFetch('GET', 'devices/logs/' + deviceSelected.value + '?rotated=true')
-      logDebug('DeviceLogView.fetchLogs()', rotated.status)
-      if (!rotated.ok) throw rotated
-      deviceLog.value = (await rotated.text()).split('\n').concat(deviceLog.value)
-    } catch {
-      logDebug('DeviceLogView.fetchLogs()', 'Failed to retrieve second log file')
+    const { generation, before } = nextLogChunk.value
+    const query = new URLSearchParams({ generation: String(generation), before: String(before) })
+    const res = await apiFetch('GET', 'devices/logs/' + deviceSelected.value + '?' + query)
+    logDebug('DeviceLogView.loadOlderLogs()', res.status)
+    if (res.status === 404) {
+      canLoadOlder.value = false
+      return
     }
+    if (!res.ok) throw res
+
+    const chunk = (await res.text()).split('\n')
+    deviceLog.value = chunk.concat(deviceLog.value)
+    const hasMore = res.headers?.get?.('x-log-has-more') === 'true'
+    nextLogChunk.value = hasMore
+      ? { generation, before: Number(res.headers.get('x-log-next-before')) }
+      : { generation: generation + 1, before: 0 }
   } catch {
     global.messageError = 'Failed to load logfile for device'
   } finally {

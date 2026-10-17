@@ -55,7 +55,7 @@ router = APIRouter(prefix="/api/devices", dependencies=[Depends(api_key_auth)])
 LOG_DIR = Path(__file__).parent.parent.parent / "log"
 # A serial device can emit arbitrary output. Keep the newest diagnostics useful
 # without letting one log force the API to read and return an unbounded response.
-_MAX_DEVICE_LOG_BYTES = 512 * 1024
+_MAX_DEVICE_LOG_BYTES = 128 * 1024
 _MAX_PROXY_BYTES = 512 * 1024
 
 
@@ -153,7 +153,7 @@ async def get_device_logs() -> List[str]:
     try:
         files = [
             f for f in os.listdir(LOG_DIR)
-            if (LOG_DIR / f).is_file() and re.fullmatch(r"[0-9a-fA-F]{6}\.log(\.1)?", f)
+            if (LOG_DIR / f).is_file() and re.fullmatch(r"[0-9a-fA-F]{6}\.log(?:\.[1-9][0-9]*)?", f)
         ]
     except FileNotFoundError:
         files = []
@@ -163,29 +163,44 @@ async def get_device_logs() -> List[str]:
 @router.get("/logs/{chip_id}",
     responses=NOT_FOUND_RESPONSES,
     tags=[DEVICES_LOCAL], dependencies=[Depends(api_key_auth)])
-async def get_device_log(chip_id: str, rotated: bool = Query(default=False)) -> Response:
-    """Retrieve the current or previous serial log for one device.
+async def get_device_log(
+    chip_id: str,
+    generation: int = Query(default=0, ge=0),
+    before: int = Query(default=0, ge=0),
+    limit: int = Query(default=_MAX_DEVICE_LOG_BYTES, ge=1, le=_MAX_DEVICE_LOG_BYTES),
+    rotated: bool = Query(default=False),
+) -> Response:
+    """Retrieve a bounded tail-first chunk from one serial-log generation.
 
     Logs are deliberately returned through the authenticated API rather than a
     public nginx alias: serial logs can include local hostnames and credentials.
+    ``before`` counts bytes already read from the end; clients use it to page
+    backwards without loading an entire retained history into the browser.
     """
-    logger.info("Endpoint GET /devices/logs/%s rotated=%s", chip_id, rotated)
+    if rotated:
+        generation = 1  # Legacy compatibility for clients requesting .log.1.
+    logger.info("Endpoint GET /devices/logs/%s generation=%d before=%d", chip_id, generation, before)
     if not re.fullmatch(r"[0-9a-fA-F]{6}", chip_id):
         raise HTTPException(status_code=400, detail="Invalid chip_id")
-    path = LOG_DIR / f"{chip_id}.log{'.1' if rotated else ''}"
+    suffix = "" if generation == 0 else f".{generation}"
+    path = LOG_DIR / f"{chip_id}.log{suffix}"
     try:
         size = path.stat().st_size
         with path.open("rb") as stream:
-            truncated = size > _MAX_DEVICE_LOG_BYTES
-            if truncated:
-                stream.seek(-_MAX_DEVICE_LOG_BYTES, os.SEEK_END)
+            end = max(0, size - before)
+            start = max(0, end - limit)
+            stream.seek(start)
             content = stream.read().decode("utf-8", errors="replace")
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Log file not found") from exc
-    headers = {"Cache-Control": "no-store"}
-    if truncated:
-        content = "[... older log content omitted ...]\n" + content
-        headers["X-Log-Truncated"] = "true"
+    headers = {
+        "Cache-Control": "no-store",
+        "X-Log-Generation": str(generation),
+        "X-Log-Size": str(size),
+        "X-Log-Offset": str(start),
+        "X-Log-Next-Before": str(size - start),
+        "X-Log-Has-More": str(start > 0).lower(),
+    }
     return Response(content=content, media_type="text/plain", headers=headers)
 
 
@@ -197,9 +212,11 @@ async def delete_device_log(chip_id: str) -> None:
     logger.info("Endpoint DELETE /devices/logs/%s", chip_id)
     if not re.fullmatch(r"[0-9a-fA-F]{6}", chip_id):
         raise HTTPException(status_code=400, detail="Invalid chip_id")
-    for suffix in ["", ".1"]:
+    for path in LOG_DIR.glob(f"{chip_id}.log*"):
+        if not re.fullmatch(rf"{re.escape(chip_id)}\.log(?:\.[1-9][0-9]*)?", path.name):
+            continue
         try:
-            (LOG_DIR / f"{chip_id}.log{suffix}").unlink()
+            path.unlink()
         except FileNotFoundError:
             pass
 
