@@ -71,11 +71,43 @@ def _async_client_mock(response_data, side_effect=None):
 # GET /brewfather/batch/
 # ---------------------------------------------------------------------------
 
-def test_list_no_flags_returns_empty(app_client):
-    """GET with no status flags returns empty list without calling Brewfather."""
-    r = app_client.get("/brewfather/batch", headers=headers)
+def _batch_with(batch_id, brew_date):
+    batch = _fake_batch()
+    batch["_id"] = batch_id
+    if brew_date is None:
+        del batch["brewDate"]
+    else:
+        batch["brewDate"] = brew_date
+    return batch
+
+
+def test_list_no_flags_makes_single_request_without_status(app_client):
+    """GET with no status flags makes one request with no status filter."""
+    with patch("oss.routers.brewfather.get_settings") as mock_cfg, \
+         patch("oss.routers.brewfather.httpx.AsyncClient") as mock_cls:
+        mock_cfg.return_value = _mock_settings()
+        client = _async_client_mock([_fake_batch()])
+        mock_cls.return_value = client
+        r = app_client.get("/brewfather/batch", headers=headers)
     assert r.status_code == 200
-    assert r.json() == []
+    assert len(r.json()) == 1
+    assert client.get.await_count == 1
+    assert "status" not in client.get.await_args.kwargs["params"]
+
+
+def test_list_request_params_limit_and_ordering(app_client):
+    """Every request asks for the newest 50 batches, ordered by brew date."""
+    with patch("oss.routers.brewfather.get_settings") as mock_cfg, \
+         patch("oss.routers.brewfather.httpx.AsyncClient") as mock_cls:
+        mock_cfg.return_value = _mock_settings()
+        client = _async_client_mock([_fake_batch()])
+        mock_cls.return_value = client
+        app_client.get("/brewfather/batch/?fermenting=true", headers=headers)
+    params = client.get.await_args.kwargs["params"]
+    assert params["limit"] == 50
+    assert params["order_by"] == "brewDate"
+    assert params["order_by_direction"] == "desc"
+    assert params["status"] == "Fermenting"
 
 
 def test_list_missing_api_keys_returns_424(app_client):
@@ -114,16 +146,31 @@ def test_list_success_returns_batches(app_client):
 
 
 def test_list_multiple_flags_aggregates(app_client):
-    """Setting multiple flags fetches from multiple statuses and combines results."""
+    """Multiple flags: one request per status, merged, de-duplicated, newest first."""
+    old, new, dup, undated = 1600000000000, 1700000000000, 1650000000000, None
+    responses = {
+        "Fermenting": [_batch_with("a", old), _batch_with("b", new), _batch_with("n", undated)],
+        "Completed": [_batch_with("b", new), _batch_with("c", dup)],
+    }
     with patch("oss.routers.brewfather.get_settings") as mock_cfg, \
          patch("oss.routers.brewfather.httpx.AsyncClient") as mock_cls:
         mock_cfg.return_value = _mock_settings()
-        mock_cls.return_value = _async_client_mock([_fake_batch()])
+        client = _async_client_mock(None)
+
+        async def _get(**kwargs):
+            response = MagicMock()
+            response.json.return_value = responses[kwargs["params"]["status"]]
+            return response
+
+        client.get = AsyncMock(side_effect=_get)
+        mock_cls.return_value = client
         r = app_client.get(
             "/brewfather/batch/?fermenting=true&completed=true", headers=headers
         )
     assert r.status_code == 200
-    assert len(r.json()) == 2  # one per status flag
+    assert client.get.await_count == 2
+    assert [b["brewfatherId"] for b in r.json()] == ["b", "c", "a", "n"]
+    assert r.json()[-1]["brewDate"] == ""
 
 
 # ---------------------------------------------------------------------------

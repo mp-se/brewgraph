@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime
 from json import JSONDecodeError
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from urllib.parse import quote
 
 import httpx
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from core.models.platform import TenantSettings
 logger = logging.getLogger(__name__)
 
-MAX_RECORDS = 100
+MAX_RECORDS = 50
 
 
 class BrewfatherService:
@@ -89,8 +89,8 @@ class BrewfatherService:
             "fermentationSteps": json.dumps(fermentation_steps),
         }
 
-    async def fetch_batch_list(self, status: str) -> list:
-        """Fetch batch list from Brewfather API for a given status."""
+    async def fetch_batch_list(self, status: Optional[str] = None) -> list:
+        """Fetch the newest batches from Brewfather, optionally for one status."""
         self._check_credentials()
 
         try:
@@ -103,9 +103,12 @@ class BrewfatherService:
                 params = {
                     "include": include_fields,
                     "complete": False,
-                    "status": status,
                     "limit": MAX_RECORDS,
+                    "order_by": "brewDate",
+                    "order_by_direction": "desc",
                 }
+                if status is not None:
+                    params["status"] = status
                 res = await client.get(url=url, params=params, auth=self._auth)
                 batch_list = res.json()
 

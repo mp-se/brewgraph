@@ -43,7 +43,7 @@ def test_update_tenant_settings(app_client):
 
 
 def test_update_tenant_settings_includes_public_display_presentation(app_client):
-    """Authenticated settings owns OSS display branding, never an access gate."""
+    """Authenticated settings owns display branding, never an access gate."""
     r = app_client.patch(
         "/tenant/settings",
         json={

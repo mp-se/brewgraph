@@ -68,7 +68,7 @@ class StorageVesselService(BaseService[StorageVessel, StorageVesselCreate, Stora
     def _reject_archived_batch(self, batch_id) -> None:
         """An archived batch is read-only and done fermenting/packaging — it cannot
         gain a new vessel link. Also keeps the un-archive vessel-connection check
-        (BatchService.update, spec-data-model.md §5.7 "Archiving") from being fooled
+        (BatchService.update) from being fooled
         by a vessel attached after the fact.
 
         Uses `get_active()` (not `get()`) to detect a soft-deleted batch instead of

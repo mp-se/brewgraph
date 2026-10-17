@@ -124,6 +124,35 @@ body {
   padding-left: var(--app-space-inline);
 }
 
+/* Quasar fields ignore native validity, so a validated form marks its invalid controls itself. */
+.app-validation.was-validated .q-field--outlined:has(:invalid) .q-field__control::before,
+.app-validation.was-validated .q-field--outlined:has(:invalid) .q-field__control::after {
+  border-color: var(--danger);
+}
+
+.app-validation.was-validated .q-field--outlined:has(:invalid) .q-field__control {
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--danger) 25%, transparent);
+}
+
+.app-validation.was-validated .q-field--outlined:has(:invalid) .q-field__control-container::after {
+  content: 'error_outline';
+  align-self: center;
+  margin-left: auto;
+  color: var(--danger);
+  font-family: 'Material Icons';
+  font-size: 1.25rem;
+}
+
+.app-validation.was-validated .app-form-field:has(:invalid) .app-field-label,
+.app-validation.was-validated .app-form-field:has(:invalid) .app-field-help {
+  color: var(--danger);
+}
+
+/* A gutter row that follows other content keeps its children's top padding as the gap. */
+.app-page .row.q-col-gutter-md.home-status-cards {
+  margin-top: 0;
+}
+
 /* Dividers use one rhythm everywhere, regardless of Quasar's default hr styling. */
 .app-page hr {
   display: block;

@@ -7,7 +7,7 @@
 # disclosure, a separate Commercial License is required.
 # See LICENSE for details.
 
-"""Tests for the `archived` batch status — see spec-data-model.md §5.7 "Archiving".
+"""Tests for the `archived` batch status.
 
 Covers: reachability from either fermenting or packaged, read-only enforcement
 on the batch itself and its sub-resources, chamber-control deactivation on

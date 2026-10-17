@@ -120,7 +120,15 @@ async def test_fetch_batch_list_success():
 
         svc = BrewfatherService(_mock_settings())
         result = await svc.fetch_batch_list("Fermenting")
+        params = mock_client.get.await_args.kwargs["params"]
+        await svc.fetch_batch_list()
+        all_params = mock_client.get.await_args.kwargs["params"]
 
+    assert params["status"] == "Fermenting"
+    assert params["limit"] == 50
+    assert params["order_by"] == "brewDate"
+    assert params["order_by_direction"] == "desc"
+    assert "status" not in all_params
     assert len(result) == 1
     batch = result[0]
     assert batch["brewfatherId"] == "abc123"

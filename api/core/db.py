@@ -14,16 +14,32 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import NullPool
 
-from core.config import get_settings
+from core.config import Settings, get_settings
 from core.models import Base
 from core.models import \
     platform as _platform  # SystemLog + IngestionLog (infrastructure)
 
 logger = logging.getLogger(__name__)
+
+
+def create_postgres_engine(url: str, settings: Settings) -> Engine:
+    """Create the pooled PostgreSQL engine from the DB_POOL_* settings (no secrets logged)."""
+    logger.info(
+        "Postgres pool: pool_size=%d max_overflow=%d pool_timeout=%ds pool_pre_ping=True",
+        settings.db_pool_size, settings.db_max_overflow, settings.db_pool_timeout,
+    )
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+    )
+
 
 db_url = get_settings().database_url.get_secret_value()
 
@@ -39,13 +55,7 @@ if db_url.startswith("sqlite:"):
     engine = create_engine(db_url, connect_args={"check_same_thread": False}, poolclass=NullPool)
 else:
     logger.info("Creating database engine for Postgres.")
-    engine = create_engine(
-        db_url,
-        pool_pre_ping=True,
-        pool_size=20,
-        max_overflow=20,
-        pool_timeout=10,
-    )
+    engine = create_postgres_engine(db_url, get_settings())
 
 
 def create_tables() -> None:

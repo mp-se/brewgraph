@@ -27,9 +27,9 @@ def oss_auth_provider(
 ) -> AuthContext:
     """Resolve caller identity via the shared API key.
 
-    Keeps the OSS shared-key authentication mechanism, while making the policy
-    boundary used by every protected OSS router independently overridable.  The
-    quota provider is folded into an otherwise-unlimited OSS context here, so an
+    Keeps the shared-key authentication mechanism, while making the policy
+    boundary used by every protected router independently overridable.  The
+    quota provider is folded into an otherwise-unlimited context here, so an
     override applies to real create routes rather than only to a test app.
     """
     if auth.quota_limits:

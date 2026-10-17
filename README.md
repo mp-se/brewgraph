@@ -181,6 +181,9 @@ docker compose up -d
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | SQLAlchemy URL for the PostgreSQL database. Set automatically by `docker-compose.yaml` |
 | `API_KEY` | Yes | — | Bearer token for authenticated UI and management API requests; ingest endpoints use per-device tokens |
+| `DB_POOL_SIZE` | No | `20` | PostgreSQL connections kept open per API process (integer >= 1). Ignored for SQLite |
+| `DB_MAX_OVERFLOW` | No | `20` | Extra PostgreSQL connections a process may open beyond `DB_POOL_SIZE` under load (integer >= 0) |
+| `DB_POOL_TIMEOUT` | No | `10` | Seconds a request waits for a free connection before failing (integer >= 1) |
 | `SCHEDULER_ENABLED` | No | `true` | Enable background jobs |
 | `CACHE_ENABLED` | No | `true` | Enable Redis cache |
 | `REDIS_HOST` | No | — | Redis hostname (required if `CACHE_ENABLED=true`) |
@@ -192,6 +195,8 @@ docker compose up -d
 | `AUTH_BLOCK_SECONDS` | No | `300` | Seconds an IP stays blocked after too many failures |
 | `BREWFATHER_USER_KEY` | No | — | Brewfather integration user key |
 | `BREWFATHER_API_KEY` | No | — | Brewfather integration API key |
+
+Each API process can open up to `DB_POOL_SIZE + DB_MAX_OVERFLOW` database connections (40 with the defaults). When several processes share one database, the sum of that figure over all of them must stay below PostgreSQL's `max_connections` (default 100), with headroom for migrations and admin sessions. An invalid value stops startup with an error naming the variable.
 
 ### Web (`brewgraph-web`)
 
@@ -207,7 +212,8 @@ docker compose up -d
 | `API_HOST` | — | Hostname of `brewgraph-api` |
 | `API_KEY` | — | Bearer token |
 | `REDIS_HOST` | — | Redis hostname (optional) |
-| `MAX_FILE_SIZE` | `100000` | Bytes before log rotation |
+| `MAX_FILE_SIZE` | `1048576` | Bytes before log rotation |
+| `MAX_LOG_FILES` | `5` | Retained files per device, including the active log |
 
 ### BLE sidecar (`brewgraph-ble`)
 

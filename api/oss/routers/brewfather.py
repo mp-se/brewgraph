@@ -12,7 +12,7 @@ import logging
 import re
 from datetime import datetime
 from json import JSONDecodeError
-from typing import List
+from typing import List, Optional
 
 import httpx
 from fastapi import Depends
@@ -23,14 +23,13 @@ from starlette.exceptions import HTTPException
 from core.config import get_settings
 from core.schemas.errors import NOT_FOUND_RESPONSES
 from oss.extensions.auth import oss_auth_provider as api_key_auth
+from oss.services.brewfather import MAX_RECORDS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/brewfather", tags=["brewfather"], dependencies=[Depends(api_key_auth)]
 )
 _TIMEOUT = httpx.Timeout(15.0, connect=10.0, read=15.0)
-
-MAX_RECORDS = 100
 
 
 class BrewfatherFermentationStep(BaseModel):
@@ -103,8 +102,12 @@ def _parse_dry_hops(recipe: dict) -> List["BrewfatherDryHop"]:
     return dry_hops
 
 
-async def _fetch_batch_list(status: str) -> List[BrewfatherBatch]:  # pylint: disable=too-many-locals
-    """Fetch batches from Brewfather API for a given status."""
+async def _fetch_batch_list(status: Optional[str]) -> List[BrewfatherBatch]:  # pylint: disable=too-many-locals
+    """Fetch the newest batches from Brewfather, optionally for one status.
+
+    Brewfather's ``status`` parameter takes a single value; ``None`` omits it,
+    which returns batches of every status.
+    """
     settings = get_settings()
     user_key = settings.brewfather_user_key.get_secret_value()
     api_key = settings.brewfather_api_key.get_secret_value()
@@ -124,14 +127,18 @@ async def _fetch_batch_list(status: str) -> List[BrewfatherBatch]:  # pylint: di
             include_fields = (
                 f"{recipe_fields},recipe.style.name,recipe.fermentation,recipe.hops"
             )
+            params = {
+                "include": include_fields,
+                "complete": False,
+                "limit": MAX_RECORDS,
+                "order_by": "brewDate",
+                "order_by_direction": "desc",
+            }
+            if status is not None:
+                params["status"] = status
             res = await client.get(
                 url="https://api.brewfather.app/v2/batches",
-                params={
-                    "include": include_fields,
-                    "complete": False,
-                    "status": status,
-                    "limit": MAX_RECORDS,
-                },
+                params=params,
                 auth=(user_key, api_key),
             )
             batch_list = res.json()
@@ -167,7 +174,10 @@ async def _fetch_batch_list(status: str) -> List[BrewfatherBatch]:  # pylint: di
 
             batches.append(BrewfatherBatch(
                 name=name,
-                brewDate=datetime.fromtimestamp(batch["brewDate"] / 1000.0).strftime("%Y-%m-%d"),
+                brewDate=(
+                    datetime.fromtimestamp(batch["brewDate"] / 1000.0).strftime("%Y-%m-%d")
+                    if batch.get("brewDate") else ""
+                ),
                 style=style,
                 brewer=batch.get("brewer", ""),
                 abv=abv,
@@ -215,23 +225,34 @@ async def list_brewfather_batches(
     completed: bool = False,
     archived: bool = False,
 ) -> List[BrewfatherBatch]:
-    """Fetch batches from Brewfather filtered by status flags."""
+    """Fetch batches from Brewfather, newest brew date first.
+
+    With no status flag every batch is returned; otherwise one request is made
+    per flagged status and the results are merged and de-duplicated.
+    """
     logger.info(
         "Endpoint GET /api/brewfather/batch/ planning=%s brewing=%s "
         "fermenting=%s completed=%s archived=%s",
         planning, brewing, fermenting, completed, archived,
     )
-    batches: List[BrewfatherBatch] = []
-    for flag, status in [
-        (planning, "Planning"),
-        (brewing, "Brewing"),
-        (fermenting, "Fermenting"),
-        (completed, "Completed"),
-        (archived, "Archived"),
-    ]:
-        if flag:
-            batches += await _fetch_batch_list(status)
-    return batches
+    statuses = [
+        status
+        for flag, status in [
+            (planning, "Planning"),
+            (brewing, "Brewing"),
+            (fermenting, "Fermenting"),
+            (completed, "Completed"),
+            (archived, "Archived"),
+        ]
+        if flag
+    ]
+    merged: dict[str, BrewfatherBatch] = {}
+    for status in statuses or [None]:
+        for batch in await _fetch_batch_list(status):
+            merged.setdefault(batch.brewfatherId, batch)
+    # brewDate is ISO (YYYY-MM-DD) or empty, so string order is date order and
+    # batches without a date sort last when reversed.
+    return sorted(merged.values(), key=lambda b: b.brewDate, reverse=True)
 
 
 @router.get(

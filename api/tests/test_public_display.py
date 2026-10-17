@@ -1,7 +1,7 @@
 # Copyright (c) 2024-2026 Magnus Persson
 # SPDX-License-Identifier: GPL-3.0-only
 
-"""Contract tests for the anonymous OSS public-display resources."""
+"""Contract tests for the anonymous public-display resources."""
 from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 

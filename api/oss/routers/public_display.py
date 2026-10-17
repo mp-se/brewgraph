@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # BrewGraph — https://github.com/mp-se/brewgraph
 
-"""Anonymous, deployment-exposed display documents for an OSS installation."""
+"""Anonymous, deployment-exposed display documents for an installation."""
 import hashlib
 import json
 import logging
@@ -90,7 +90,7 @@ def get_public_taps(
     request: Request,
     db_session: Session = Depends(get_session),
 ) -> Response:
-    """Return the complete OSS tap display as a top-level anonymous array."""
+    """Return the complete tap display as a top-level anonymous array."""
     _rate_limit(request, "tap")
     service = PublicDisplayService(db_session)
     return _cached_document("tap", lambda: service.build_public_tap_list(service.oss_context()))

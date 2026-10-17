@@ -74,7 +74,7 @@ class BatchService(BaseService[Batch, BatchCreate, BatchUpdate]):
         - Un-archiving (``archived`` → anything else) ignores the client's literal
           status value and derives the real one: ``packaged`` if a `StorageVessel`
           is currently connected to the batch, otherwise ``fermenting`` — live
-          state, not a replayed snapshot. See spec-data-model.md §5.7 "Archiving".
+          state, not a replayed snapshot.
 
         Returns the (possibly replaced) ``obj`` for the caller to continue with.
         """

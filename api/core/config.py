@@ -25,6 +25,17 @@ def generate_api_key(key_length: int) -> str:
     return secrets.token_urlsafe(key_length)
 
 
+def bounded_int(name: str, default: int, minimum: int) -> int:
+    """Read integer environment variable `name`, rejecting values below `minimum`.
+
+    Raises ValueError naming the variable, so a bad value stops startup with a clear message.
+    """
+    value = config(name, cast=int, default=default)
+    if value < minimum:
+        raise ValueError(f"Config '{name}' has value {value}. Must be an integer >= {minimum}.")
+    return value
+
+
 class Settings(BaseSettings):
     """Application settings and configuration parameters."""
     version: str = "2.0.0"
@@ -61,6 +72,12 @@ class Settings(BaseSettings):
     # Cap on a stored JSON envelope. An unbounded JSON column is an unbounded row; 16 KiB
     # is generous for a firmware config and far past any prediction payload.
     max_envelope_bytes: int = config("MAX_ENVELOPE_BYTES", cast=int, default=16 * 1024)
+    # PostgreSQL connection pool, per process. Each process may hold up to
+    # db_pool_size + db_max_overflow connections; the sum over all processes sharing a
+    # database must stay below its max_connections. Ignored for SQLite.
+    db_pool_size: int = bounded_int("DB_POOL_SIZE", default=20, minimum=1)
+    db_max_overflow: int = bounded_int("DB_MAX_OVERFLOW", default=20, minimum=0)
+    db_pool_timeout: int = bounded_int("DB_POOL_TIMEOUT", default=10, minimum=1)
 
     logger.info("redis_host: %s", redis_host)
     logger.info("redis_password: %s", "set" if redis_password else "not set")

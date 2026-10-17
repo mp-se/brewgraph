@@ -7,12 +7,18 @@
 import type { ExportDocument } from './exportDocument'
 import type { BrewGraphTapRecord, BrewGraphVesselRecord } from './types'
 import type { DeviceAssignment } from './restoreTypes'
+import { fillFormulaFromConfig } from './deviceConfigFormula'
 
 export function mapDevicePayload(device: ExportDocument['devices'][number]): {
   payload: Record<string, unknown>
   assignment: DeviceAssignment
+  /** Parts of the device's captured configuration that could not be used. */
+  problems: string[]
 } {
   const payload: Record<string, unknown> = { ...device, fermentationStep: [] }
+  // A backup made before the formula fields existed carries them only in the captured config.
+  const fill = fillFormulaFromConfig(device)
+  Object.assign(payload, fill.fields)
   if (payload.collectLogs === undefined) payload.collectLogs = false
   delete payload.role
   delete payload.board
@@ -28,7 +34,8 @@ export function mapDevicePayload(device: ExportDocument['devices'][number]): {
       batchId: device.batchId ?? null,
       batchRole: device.batchRole ?? null,
       vesselId: device.vesselId ?? null
-    }
+    },
+    problems: fill.problems
   }
 }
 

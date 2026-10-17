@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # BrewGraph — https://github.com/mp-se/brewgraph
 
-"""Regression coverage for converged paid-GA safeguards that also serve OSS."""
+"""Regression coverage for shared contract safeguards."""
 import uuid
 from unittest.mock import AsyncMock
 

@@ -205,19 +205,41 @@ def test_get_device_log_rejects_invalid_or_missing_file(app_client, monkeypatch,
     assert app_client.get("/devices/logs/ABCDEF", headers=headers).status_code == 404
 
 
-def test_get_device_log_returns_bounded_tail_for_oversized_file(app_client, monkeypatch, tmp_path):
-    """An oversized serial log cannot make the API allocate an unbounded response."""
+def test_get_device_log_pages_backwards_through_oversized_file(app_client, monkeypatch, tmp_path):
+    """An oversized serial log is retrieved in bounded tail-first chunks."""
     monkeypatch.setattr(devices, "LOG_DIR", tmp_path)
     monkeypatch.setattr(devices, "_MAX_DEVICE_LOG_BYTES", 16)
     (tmp_path / "ABCDEF.log").write_bytes(b"old content\n" + b"x" * 12 + b" newest\n")
 
-    response = app_client.get("/devices/logs/ABCDEF", headers=headers)
+    response = app_client.get("/devices/logs/ABCDEF?limit=16", headers=headers)
 
     assert response.status_code == 200
-    assert response.headers["x-log-truncated"] == "true"
-    assert response.text.startswith("[... older log content omitted ...]\n")
+    assert response.headers["x-log-has-more"] == "true"
+    assert response.headers["x-log-next-before"] == "16"
     assert response.text.endswith(" newest\n")
-    assert len(response.content) <= 16 + len("[... older log content omitted ...]\n")
+    assert len(response.content) <= 16
+
+    older = app_client.get("/devices/logs/ABCDEF?limit=16&before=16", headers=headers)
+    assert older.status_code == 200
+    assert older.headers["x-log-offset"] == "0"
+    assert older.headers["x-log-has-more"] == "false"
+    assert older.text.startswith("old content\n")
+
+
+def test_device_logs_support_multiple_generations_and_delete_all(app_client, monkeypatch, tmp_path):
+    """The API exposes and removes every retained generation for a device."""
+    monkeypatch.setattr(devices, "LOG_DIR", tmp_path)
+    for suffix in ["", ".1", ".2", ".3"]:
+        (tmp_path / f"ABCDEF.log{suffix}").write_text(suffix or "active", encoding="utf-8")
+
+    listing = app_client.get("/devices/logs", headers=headers)
+    assert set(listing.json()) == {"ABCDEF.log", "ABCDEF.log.1", "ABCDEF.log.2", "ABCDEF.log.3"}
+    generation = app_client.get("/devices/logs/ABCDEF?generation=3", headers=headers)
+    assert generation.status_code == 200
+    assert generation.text == ".3"
+
+    assert app_client.delete("/devices/logs/ABCDEF", headers=headers).status_code == 204
+    assert not list(tmp_path.iterdir())
 
 
 def test_delete_device_log_no_file(app_client):

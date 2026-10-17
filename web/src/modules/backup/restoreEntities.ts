@@ -48,7 +48,8 @@ export async function restoreDevices(
   const chipToNew = new Map<string, string>()
   const assignments = new Map<string, DeviceAssignment>()
   for (const d of devices) {
-    const { payload, assignment } = mapDevicePayload(d)
+    const { payload, assignment, problems } = mapDevicePayload(d)
+    for (const problem of problems) report.problems.push(`device "${d.name || d.chipId}": ${problem}`)
 
     const res = await apiPost(deps.baseURL + 'api/devices', deps.token, payload)
     if (res.ok) {
