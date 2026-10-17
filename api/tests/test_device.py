@@ -405,6 +405,27 @@ def test_gravity_formula_blank_is_stored_as_null(app_client):
     assert patched.json()["gravityFormula"] is None
 
 
+def test_gravity_formula_exponent_notation_is_stored_as_plain_decimal(app_client):
+    """A formula with exponent literals is stored and returned without any exponent."""
+    test_init()
+    created = _post_calibrated(app_client, "EXP001", gravityFormula="-8.1595791e-7*tilt^3+1E+0")
+    assert created.status_code == 201
+    expected = "-0.00000081595791*tilt^3+1"
+    assert created.json()["gravityFormula"] == expected
+    fetched = app_client.get(f"/devices/{created.json()['id']}", headers=headers)
+    assert fetched.json()["gravityFormula"] == expected
+
+    patched = app_client.patch(
+        f"/devices/{created.json()['id']}", json={"gravityFormula": "1e-3*tilt+1"}, headers=headers
+    )
+    assert patched.status_code == 200
+    assert patched.json()["gravityFormula"] == "0.001*tilt+1"
+
+    for bad in ("1e31*tilt", "1e-31*tilt", "2e+*tilt", "1e999999999999*tilt"):
+        rejected = _post_calibrated(app_client, "EXP002", gravityFormula=bad)
+        assert rejected.status_code == 422, bad
+
+
 def test_gravity_calibration_boundaries(app_client):
     """Angle 15..90 and gravity 0.98..1.25 are inclusive; just outside is rejected."""
     test_init()

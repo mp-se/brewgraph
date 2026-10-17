@@ -556,6 +556,45 @@ describe('DeviceView - Enhanced', () => {
       expect(typeof wrapper.vm.fetchConfigFromDevice).toBe('function')
     })
 
+    it('fills the formula fields after a successful config fetch and reports what it did', async () => {
+      const { detectDeviceType } = await import('@/modules/detect')
+      detectDeviceType.mockReturnValue('gravitymon')
+      const answers = {
+        'api/status': { id: 'abc123' },
+        'api/config': {
+          wifi_pass: 'S3CRET-WIFI', gravity_formula: '1+tilt/1000', gravity_unit: 'P',
+          formula_calculation_data: [{ a: 30, g: 1.03 }, { a: 0, g: 1.09 }]
+        },
+        'api/feature': {},
+        'api/format': 'json'
+      }
+      piniaMocks.deviceStore.proxyRequest.mockImplementation(async (_m, url) => answers[url.replace('http://gm.local/', '')])
+      const wrapper = await createWrapper()
+      wrapper.vm.device = new Device({ url: 'http://gm.local/', gravityFormulaUnit: 'sg' })
+      wrapper.vm.deviceSaved = Device.fromJson(wrapper.vm.device.toJson())
+
+      await wrapper.vm.fetchConfigFromDevice()
+
+      expect(wrapper.vm.device.gravityFormula).toBe('1+tilt/1000')
+      expect(wrapper.vm.device.gravityFormulaUnit).toBe('plato')
+      expect(wrapper.vm.device.gravityCalibrationData).toEqual([{ angle: 30, gravity: 1.03 }])
+      expect(wrapper.vm.deviceChanged()).toBe(true)
+      expect(piniaMocks.global.messageSuccess).toBe('Filled formula, unit (plato), 1 calibration point from the device configuration')
+      expect(piniaMocks.global.messageError).toBe('')
+
+      // A second fetch of the same configuration has nothing new to say.
+      await wrapper.vm.fetchConfigFromDevice()
+      expect(piniaMocks.global.messageError).toBe('')
+
+      // A device holding a different formula keeps it, and is told the configuration's was not applied.
+      wrapper.vm.device.gravityFormula = '2+tilt/1000'
+      await wrapper.vm.fetchConfigFromDevice()
+      expect(wrapper.vm.device.gravityFormula).toBe('2+tilt/1000')
+      expect(piniaMocks.global.messageError).toMatch(/^Device configuration: The formula was not applied/)
+      expect(piniaMocks.global.messageError).not.toContain('S3CRET')
+      detectDeviceType.mockReturnValue('kegmon')
+    })
+
     it('should have validateUrl method', async () => {
       const wrapper = await createWrapper()
       expect(typeof wrapper.vm.validateUrl).toBe('function')

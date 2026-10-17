@@ -27,9 +27,23 @@ MIN_VALID_GRAVITY_SG = 0.98
 MAX_VALID_GRAVITY_SG = 1.25
 _MAX_LITERAL = 1_000_000
 _MAX_INTERMEDIATE = 1_000_000_000_000
-_TOKEN = re.compile(r"(?:\d+(?:\.\d*)?|\.\d+)|[A-Za-z_]\w*|[()+*/^\-]")
+_TOKEN = re.compile(r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)|[A-Za-z_][A-Za-z0-9_]*|[()+*/^\-]")
+# One left-to-right scan splits the text into words, numeric literals and single other characters,
+# so a word is skipped whole (digits inside an identifier are never read as a literal) and every
+# literal is matched whole. A literal carries an exponent only when it is a clean
+# `mantissa e [sign] digits` token: not preceded by a digit or dot, not followed by a letter, digit,
+# underscore or dot. Only such a token is rewritten; `normalize_formula` has the stray-marker rule.
+_EXPONENT_LITERAL = re.compile(
+    r"(?P<word>[A-Za-z_][A-Za-z0-9_]*)"
+    r"|(?<![.0-9])(?P<mantissa>[0-9]+(?:\.[0-9]*)?|\.[0-9]+)[eE](?P<sign>[+-]?)(?P<digits>[0-9]+)"
+    r"(?![A-Za-z0-9_.])"
+    r"|(?P<plain>[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+    r"|.",
+    re.DOTALL,
+)
+_MAX_EXPONENT = 30
 
-# Includes the SaaS-only RAPT Pill; OSS's registry still rejects that type at its API boundary.
+# Formulas are supported for these device types, including the RAPT Pill.
 GRAVITY_DEVICE_TYPES = frozenset({"gravitymon", "ispindel", "rapt_pill"})
 
 FormulaUnit = Literal["sg", "plato"]
@@ -61,7 +75,69 @@ class FormulaError(ValueError):
     """Invalid formula or a formula that cannot produce usable gravity."""
 
 
+def _plain_decimal(mantissa: str, exponent: int) -> str:
+    """Shift the decimal point of ``mantissa`` by ``exponent`` places, exactly (digits only)."""
+    whole, _, fraction = mantissa.partition(".")
+    digits = whole + fraction
+    point = len(whole) + exponent
+    if point <= 0:
+        digits = "0" * (1 - point) + digits
+        point = 1
+    elif point > len(digits):
+        digits += "0" * (point - len(digits))
+    whole, fraction = digits[:point].lstrip("0") or "0", digits[point:].rstrip("0")
+    return f"{whole}.{fraction}" if fraction else whole
+
+
+def _rewrite_exponent(match: re.Match) -> str:
+    digits = match.group("digits").lstrip("0")
+    if len(digits) > 2 or int(digits or "0") > _MAX_EXPONENT:
+        raise FormulaError(f"exponent must be between -{_MAX_EXPONENT} and {_MAX_EXPONENT}")
+    exponent = int(digits or "0") * (-1 if match.group("sign") == "-" else 1)
+    return _plain_decimal(match.group("mantissa"), exponent)
+
+
+def normalize_formula(formula: str) -> str:
+    """Rewrite every exponent-notation literal as the exactly equal plain decimal.
+
+    ``8.1595791e-7`` becomes ``0.00000081595791`` and ``1E+3`` becomes ``1000``; the
+    shift is done on the digit string, never with floating point. Everything else is
+    returned unchanged, so a formula without exponents is its own normal form. The
+    text, before and after the rewrite, must fit the length limit; an exponent outside
+    -30 to 30 is a ``FormulaError`` and is rejected before any digits are shifted.
+
+    The scan is a single left-to-right pass. A word starting with ``e`` or ``E`` that
+    directly follows a number is a stray exponent marker (``1e2e3``, ``1E+31E+3``);
+    rewriting around it could create a new literal on the next pass, so the whole
+    input is then returned unchanged and left for validation to reject. That is what
+    makes the function idempotent for every input.
+    """
+    if len(formula) > GRAVITY_FORMULA_MAX_LENGTH:
+        raise FormulaError("formula is empty or exceeds the length limit")
+    pieces = []
+    number_end = -1
+    for match in _EXPONENT_LITERAL.finditer(formula):
+        word = match.group("word")
+        if word is not None:
+            if match.start() == number_end and word[0] in "eE":
+                return formula
+            pieces.append(word)
+        elif match.group("mantissa") is not None:
+            pieces.append(_rewrite_exponent(match))
+            number_end = match.end()
+        elif match.group("plain") is not None:
+            pieces.append(match.group())
+            number_end = match.end()
+        else:
+            pieces.append(match.group())
+    result = "".join(pieces)
+    if len(result) > GRAVITY_FORMULA_MAX_LENGTH:
+        raise FormulaError("formula is empty or exceeds the length limit")
+    return result
+
+
 def _tokens(formula: str) -> list[str]:
+    formula = normalize_formula(formula)
     if not formula or len(formula) > GRAVITY_FORMULA_MAX_LENGTH:
         raise FormulaError("formula is empty or exceeds the length limit")
     tokens = []
@@ -149,7 +225,10 @@ class _Parser:
 
 
 def validate_formula(formula: str):
-    """Parse the bounded, shared firmware-compatible subset without executing code."""
+    """Parse the bounded, shared firmware-compatible subset without executing code.
+
+    Exponent notation is accepted and rewritten first (see ``normalize_formula``).
+    """
     parser = _Parser(_tokens(formula))
     node = parser.expression()
     if parser.peek() is not None:
@@ -191,7 +270,7 @@ def _value(node, tilt: float, temp: Optional[float]) -> float:  # pylint: disabl
 
 
 def plato_to_gravity(plato: float) -> float:
-    """The same Plato-to-SG conversion used by the OSS web core."""
+    """The same Plato-to-SG conversion used by the web core."""
     denominator = 258.6 - 227.1 * (plato / 258.2)
     if denominator == 0:
         raise FormulaError("Plato value cannot be converted to SG")

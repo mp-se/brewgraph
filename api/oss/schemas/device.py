@@ -19,7 +19,8 @@ from core.enums import DeviceBatchRole, DeviceColor, DeviceStatus
 from core.schemas.envelope import build_envelope, reject_if_too_large
 from oss.gravity_formula import (GRAVITY_CALIBRATION_MAX_POINTS,
                                  GRAVITY_FORMULA_MAX_LENGTH, FormulaUnit,
-                                 effective_formula_unit, validate_formula)
+                                 effective_formula_unit, normalize_formula,
+                                 validate_formula)
 from oss.registries.device_types import device_type_registry
 from oss.schemas._camel import to_camel
 
@@ -76,11 +77,13 @@ class DeviceBase(BaseModel):
     @field_validator("gravity_formula")
     @classmethod
     def _blank_formula_is_no_formula(cls, value: Optional[str]) -> Optional[str]:
-        """Store an empty or whitespace-only formula as no formula."""
+        """Store an empty or whitespace-only formula as no formula, and any exponent
+        notation as the equal plain decimal, so the stored text never holds an exponent."""
         if value is None or not value.strip():
             return None
-        validate_formula(value)
-        return value
+        normalized = normalize_formula(value)
+        validate_formula(normalized)
+        return normalized
 
     @field_validator("gravity_calibration_data")
     @classmethod

@@ -23,7 +23,69 @@ export class FormulaProfileError extends FormulaError {
   constructor(public readonly issues: string[]) { super(issues.join('; ')) }
 }
 
-function tokenize(formula: string): string[] {
+const MAX_EXPONENT = 30
+// One left-to-right scan splits the text into words, numeric literals and single other characters,
+// so a word is skipped whole (digits inside an identifier are never read as a literal) and every
+// literal is matched whole. A literal carries an exponent only when it is a clean
+// `mantissa e [sign] digits` token: not preceded by a digit or dot, not followed by a letter, digit,
+// underscore or dot. Only such a token is rewritten; see `normalizeFormula` for the stray-marker rule.
+const EXPONENT_LITERAL =
+  /([A-Za-z_][A-Za-z0-9_]*)|(?<![.0-9])([0-9]+(?:\.[0-9]*)?|\.[0-9]+)[eE]([+-]?)([0-9]+)(?![A-Za-z0-9_.])|([0-9]+(?:\.[0-9]*)?|\.[0-9]+)|[\s\S]/g
+
+/** Shift the decimal point of `mantissa` by `exponent` places, exactly (digit string only). */
+function plainDecimal(mantissa: string, exponent: number): string {
+  const dot = mantissa.indexOf('.')
+  const whole = dot < 0 ? mantissa : mantissa.slice(0, dot)
+  let digits = whole + (dot < 0 ? '' : mantissa.slice(dot + 1))
+  let point = whole.length + exponent
+  if (point <= 0) {
+    digits = '0'.repeat(1 - point) + digits
+    point = 1
+  } else if (point > digits.length) digits += '0'.repeat(point - digits.length)
+  const integer = digits.slice(0, point).replace(/^0+/, '') || '0'
+  const fraction = digits.slice(point).replace(/0+$/, '')
+  return fraction ? `${integer}.${fraction}` : integer
+}
+
+/**
+ * Rewrite every exponent-notation literal as the exactly equal plain decimal: `8.1595791e-7`
+ * becomes `0.00000081595791`, `1E+3` becomes `1000`. Everything else is returned unchanged, so a
+ * formula without exponents is its own normal form. The text, before and after the rewrite, must
+ * fit the length limit; an exponent outside -30 to 30 throws a FormulaError before any digits are
+ * shifted. The scan is a single left-to-right pass: a word starting with `e` or `E` that directly
+ * follows a number is a stray exponent marker (`1e2e3`, `1E+31E+3`), and the whole input is then
+ * returned unchanged for validation to reject, which makes the function idempotent for every
+ * input. Byte-identical to the Python `normalize_formula`.
+ */
+export function normalizeFormula(formula: string): string {
+  if (formula.length > GRAVITY_FORMULA_MAX_LENGTH) throw new FormulaError('Formula is empty or too long')
+  const pieces: string[] = []
+  let numberEnd = -1
+  for (const match of formula.matchAll(EXPONENT_LITERAL)) {
+    const [text, word, mantissa, sign, digits] = match
+    const start = match.index as number
+    if (word !== undefined) {
+      if (start === numberEnd && (word[0] === 'e' || word[0] === 'E')) return formula
+      pieces.push(word)
+    } else if (mantissa !== undefined) {
+      const significant = digits.replace(/^0+/, '')
+      if (significant.length > 2 || Number(significant || '0') > MAX_EXPONENT) {
+        throw new FormulaError(`Exponent must be between -${MAX_EXPONENT} and ${MAX_EXPONENT}`)
+      }
+      pieces.push(plainDecimal(mantissa, Number(significant || '0') * (sign === '-' ? -1 : 1)))
+      numberEnd = start + text.length
+    } else {
+      pieces.push(text)
+      if (match[5] !== undefined) numberEnd = start + text.length
+    }
+  }
+  const result = pieces.join('')
+  if (result.length > GRAVITY_FORMULA_MAX_LENGTH) throw new FormulaError('Formula is empty or too long')
+  return result
+}
+
+function tokenize(source: string): string[] {
+  const formula = normalizeFormula(source)
   if (!formula || formula.length > GRAVITY_FORMULA_MAX_LENGTH) throw new FormulaError('Formula is empty or too long')
   const tokens: string[] = []
   const pattern = /(?:\d+(?:\.\d*)?|\.\d+)|[A-Za-z_]\w*|[-()+*/^]/y
@@ -234,9 +296,9 @@ export function parseProfile(raw: string, deviceType: string): FormulaProfile {
   if (profile.format !== 'brewgraph-gravity-formula') issues.push('Unsupported profile format')
   if (profile.version !== 1) issues.push('Unsupported profile version')
   if (profile.gravityFormula !== null && typeof profile.gravityFormula !== 'string') issues.push('Invalid formula field')
-  const formula = typeof profile.gravityFormula === 'string' ? profile.gravityFormula.trim() || null : null
+  let formula = typeof profile.gravityFormula === 'string' ? profile.gravityFormula.trim() || null : null
   if (formula) {
-    try { validateFormula(formula) }
+    try { formula = normalizeFormula(formula); validateFormula(formula) }
     catch (error) { issues.push((error as Error).message) }
   }
   const unit = profile.gravityFormulaUnit ?? null
@@ -269,8 +331,9 @@ export function parseProfile(raw: string, deviceType: string): FormulaProfile {
 
 export function serializeProfile(formula: string | null, unit: FormulaUnit | null,
   points: CalibrationPoint[]): string {
-  if (formula) validateFormula(formula)
+  const stored = formula ? normalizeFormula(formula) : formula
+  if (stored) validateFormula(stored)
   validateCalibrationPoints(points)
-  return JSON.stringify({ format: 'brewgraph-gravity-formula', version: 1, gravityFormula: formula,
+  return JSON.stringify({ format: 'brewgraph-gravity-formula', version: 1, gravityFormula: stored,
     gravityFormulaUnit: unit, gravityCalibrationData: points } satisfies FormulaProfile, null, 2)
 }

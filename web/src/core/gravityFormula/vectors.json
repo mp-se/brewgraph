@@ -18,7 +18,8 @@
     { "formula": "1.025 + (temp - 20) / 1000", "unit": "sg", "tilt": 30, "temp": 25, "gravitySg": 1.03 }
   ],
   "invalidFormula": [
-    "tilt + unknown", "__proto__", "constructor", "pi", "1e2", "tilt^0", "tilt^7", "tilt^-1", "tilt^(2)", "tilt^temp", "1 +", "(tilt", "tilt;1", ""
+    "tilt + unknown", "__proto__", "constructor", "pi", "tilt^0", "tilt^7", "tilt^-1", "tilt^(2)", "tilt^temp", "1 +", "(tilt", "tilt;1", "",
+    "٣*0+1.01", "１+tilt", "0.٥", "1\u00a0+tilt", "1\u2003+tilt", "1\u200b+tilt", "tilt٣"
   ],
   "invalidReading": [
     { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 14.99, "temp": 20 },
@@ -29,5 +30,31 @@
   "temperatureCorrection": [
     { "gravitySg": 1.05, "tempC": 20, "calibrationTempC": 20, "correctedSg": 1.05 },
     { "gravitySg": 1.05, "tempC": 25, "calibrationTempC": 20, "correctedSg": 1.0511745304031856 }
-  ]
+  ],
+  "normalization": {
+    "valid": [
+      { "input": "8.1595791e-7", "output": "0.00000081595791" },
+      { "input": "2.5e0", "output": "2.5" },
+      { "input": "1.50e1", "output": "15" },
+      { "input": "1E+3", "output": "1000" },
+      { "input": "1e0003", "output": "1000" },
+      { "input": "5e-0", "output": "5" },
+      { "input": "0e5", "output": "0" },
+      { "input": ".5e1", "output": "5" },
+      { "input": "1.e2", "output": "100" },
+      { "input": "12.5e-1", "output": "1.25" },
+      { "input": "1.0e-1", "output": "0.1" },
+      { "input": "1e-30", "output": "0.000000000000000000000000000001" },
+      { "input": "1e30", "output": "1000000000000000000000000000000" },
+      { "input": "1e-3*tilt+1.5E2", "output": "0.001*tilt+150" },
+      { "input": "-8.1595791e-7*tilt^3+0.00010120890*tilt^2-0.0022066128*tilt+0.99997836", "output": "-0.00000081595791*tilt^3+0.00010120890*tilt^2-0.0022066128*tilt+0.99997836" },
+      { "input": "temp*2e1", "output": "temp*20" },
+      { "input": "1.01+tilt/1000", "output": "1.01+tilt/1000" }
+    ],
+    "notAnExponent": ["2e", "2e+", "2e-x", "1 e5", "e5", "tilt2e5", "1e٣", "1..5e1", "1.5.2e1", "1.5e2.3", "1e2.5", "1e2e3", "1e2e3e4", "tilt1e2", "temp*2e1x"],
+    "strayMarker": ["1E+31E+3", "1e+0.e5)", "1e3e", "2e1E1", "1e+3e+3", "1.e2e", "0.5e1e1+1e1", "1e1+2e2e5", "5E-1E-1", "tilt*1e2e-2", "1e30e30", "(2e1)+3e1e"],
+    "junkDigest": "8fb98a65",
+    "invalidExponent": ["1e31", "1e-31", "1e0031", "1e999999999999", "1e-999999999999", "1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30"],
+    "invalidFormula": ["1..5e1", "1.5.2e1", "1.5e2.3", "1e2.5", "1e2e3", "1e2e3e4", "+e", "2e", "2e+", "2e-x", "1e31", "1e-31", "1e999999999999", "1e٣", "1 e5", "e5", "1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30+1e-30"]
+  }
 }

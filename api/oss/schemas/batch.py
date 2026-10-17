@@ -49,7 +49,7 @@ class BatchBase(BaseModel):
     conditioning_days: Optional[int] = Field(default=None)
     notes: Optional[str] = Field(default=None)
     yeast: Optional[str] = Field(default=None, max_length=100)
-    yeast_product_id: Optional[str] = Field(default=None, max_length=40)
+    yeast_product_id: Optional[str] = Field(default=None, max_length=64)
     gravity_device_id: Optional[uuid.UUID] = Field(default=None)
     pressure_device_id: Optional[uuid.UUID] = Field(default=None)
     temp_device_id: Optional[uuid.UUID] = Field(default=None)

@@ -50,6 +50,18 @@ describe('GravityFormulaEditor', () => {
     expect(latest).toContain('tilt')
   })
 
+  it('accepts exponent notation, shows the rewritten text and applies it when the field is left', async () => {
+    const wrapper = editor({ points: [{ angle: 20, gravity: 1.02 }], formula: null })
+    vm(wrapper).setFormula('-8.1595791e-7*tilt+1')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="formula-rewritten"]').text()).toContain('-0.00000081595791*tilt+1')
+    ;(wrapper.vm as unknown as { applyRewrite: () => void }).applyRewrite()
+    await flushPromises()
+    const emitted = wrapper.emitted('update:formula') ?? []
+    expect(emitted[emitted.length - 1]?.[0]).toBe('-0.00000081595791*tilt+1')
+    expect(wrapper.find('[data-testid="formula-rewritten"]').exists()).toBe(false)
+  })
+
   it('reports a copied formula to the page', async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
     const wrapper = editor({ points: [{ angle: 20, gravity: 1.02 }], formula: 'tilt' })

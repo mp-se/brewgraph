@@ -305,6 +305,7 @@ import AppPageHeader from '@/components/AppPageHeader.vue'
 import DeviceClassificationFields from '@/components/DeviceClassificationFields.vue'
 import CodeViewModal from '@/components/CodeViewModal.vue'
 import { deviceConfigText, fetchDeviceConfigV1 } from '@/modules/deviceConfigFetch'
+import { describeFormulaFill, fillFormulaFromConfig } from '@/modules/backup/deviceConfigFormula'
 
 const render = ref('{}')
 const device = ref(null)
@@ -419,9 +420,21 @@ async function fetchConfigFromDevice() {
 }
 
 async function fetchConfigEspFwkV1() {
-  return fetchDeviceConfigV1(device.value, (...args) => deviceStore.proxyRequest(...args), (message) => {
+  const fetched = await fetchDeviceConfigV1(device.value, (...args) => deviceStore.proxyRequest(...args), (message) => {
     global.messageError = message
   })
+  if (fetched) fillFormulaFromFetchedConfig()
+  return fetched
+}
+
+// The fetched configuration fills the formula fields of a device that has no formula and no
+// calibration points; the values reach the stored device through the ordinary save.
+function fillFormulaFromFetchedConfig() {
+  const fill = fillFormulaFromConfig(device.value)
+  Object.assign(device.value, fill.fields)
+  const filled = describeFormulaFill(fill)
+  if (filled) global.messageSuccess = filled
+  if (fill.problems.length) global.messageError = 'Device configuration: ' + fill.problems.join('; ')
 }
 
 function validateUrl() {

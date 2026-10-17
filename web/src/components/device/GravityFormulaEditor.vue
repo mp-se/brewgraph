@@ -18,8 +18,11 @@
               label="Formula" outlined autogrow type="textarea" input-class="text-mono"
               :maxlength="GRAVITY_FORMULA_MAX_LENGTH" :disable="disabled"
               :error="!!visibleFormulaError" :error-message="visibleFormulaError || undefined"
-              aria-label="Formula" />
+              aria-label="Formula" @blur="applyRewrite" />
             <div class="text-caption text-secondary">{{ formulaText.length }} / {{ GRAVITY_FORMULA_MAX_LENGTH }}</div>
+            <div v-if="rewrittenFormula" class="text-caption text-mono" data-testid="formula-rewritten" aria-live="polite">
+              Stored as: {{ rewrittenFormula }}
+            </div>
           </div>
         </div>
         <p class="text-caption q-mt-sm">
@@ -125,7 +128,7 @@ import { copyToClipboard } from 'quasar'
 import { Chart, registerables } from 'chart.js'
 import {
   GRAVITY_FORMULA_MAX_LENGTH, GRAVITY_CALIBRATION_MAX_POINTS,
-  evaluateFormula, fitPolynomial, parseProfile, serializeProfile, validateFormula,
+  evaluateFormula, fitPolynomial, normalizeFormula, parseProfile, serializeProfile, validateFormula,
   FormulaProfileError, type CalibrationPoint, type FormulaUnit
 } from '@/core/gravityFormula'
 import { gravityToPlato, platoToGravity } from '@/core/calculations/units'
@@ -191,6 +194,14 @@ const formulaError = computed(() => {
   if (!formulaText.value.trim()) return ''
   try { validateFormula(formulaText.value); return '' } catch (error) { return (error as Error).message }
 })
+// A formula typed with exponent notation is stored as the equal plain decimal; the rewrite is shown
+// as a hint while typing and applied when the field loses focus, never mid-keystroke.
+const rewrittenFormula = computed(() => {
+  const text = formulaText.value.trim()
+  if (!text) return ''
+  try { const rewritten = normalizeFormula(text); return rewritten === text ? '' : rewritten } catch { return '' }
+})
+function applyRewrite() { if (rewrittenFormula.value) setFormula(rewrittenFormula.value) }
 watch(formulaText, () => {
   clearTimeout(timer)
   timer = setTimeout(() => { visibleFormulaError.value = formulaError.value }, 200)
