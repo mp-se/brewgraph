@@ -67,6 +67,7 @@ def test_invalid_values_are_rejected_naming_the_variable(name, value):
     assert f"'{name}'" in err
 
 
+@pytest.mark.skipif(engine.dialect.name != "sqlite", reason="the suite runs on PostgreSQL here")
 def test_sqlite_engine_is_unchanged():
     """The SQLite test engine still uses NullPool."""
     assert isinstance(engine.pool, NullPool)
