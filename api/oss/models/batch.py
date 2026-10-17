@@ -54,7 +54,7 @@ class Batch(Base):
     rating = mapped_column(Integer, nullable=True, default=None)
     notes = mapped_column(Text, nullable=True, default=None)
     yeast = mapped_column(String(100), nullable=True, default=None)
-    yeast_product_id = mapped_column(String(40), nullable=True, default=None)
+    yeast_product_id = mapped_column(String(64), nullable=True, default=None)
     # Pitch-rate / viability inputs recorded alongside the yeast strain.
     yeast_amount = mapped_column(Float, nullable=True, default=None)
     yeast_amount_unit = mapped_column(String(10), nullable=True, default=None)
