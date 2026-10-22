@@ -40,7 +40,9 @@ class FermentationStepBase(BaseModel):
 class FermentationStepCreate(FermentationStepBase):
     """Used when creating a fermentation step."""
 
-    batch_id: uuid.UUID
+    # The URL owns this identity; create routes fill it after body validation.
+    # Older clients may still send batchId, which the route replaces with the URL value.
+    batch_id: Optional[uuid.UUID] = None
     device_id: Optional[uuid.UUID] = None
 
 

@@ -25,7 +25,7 @@ def _create_batch(app_client) -> str:
 
 
 def _steps(batch_id: str):
-    """Build step payloads with the required batchId."""
+    """Build legacy step payloads that repeat batchId."""
     return [
         {"batchId": batch_id, "order": 1, "type": "primary", "temp": 20.0, "days": 7},
         {"batchId": batch_id, "order": 2, "type": "secondary", "temp": 18.0, "days": 14},
@@ -51,6 +51,33 @@ def test_create_fermentation_steps(app_client):
     assert len(data) == 2
     assert data[0]["order"] == 1
     assert data[1]["type"] == "secondary"
+
+
+def test_create_fermentation_steps_uses_url_batch_without_body_id(app_client):
+    """The body need not repeat the batch ID already present in the URL."""
+    batch_id = _create_batch(app_client)
+    steps = [{key: value for key, value in step.items() if key != "batchId"}
+             for step in _steps(batch_id)]
+    response = app_client.post(
+        f"/batches/{batch_id}/fermentation-steps", json=steps, headers=headers
+    )
+    assert response.status_code == 201
+    assert all(step["batchId"] == batch_id for step in response.json())
+
+
+def test_create_fermentation_steps_url_batch_wins_over_legacy_body_id(app_client):
+    """A stale legacy body ID must never redirect writes to another batch."""
+    batch_id = _create_batch(app_client)
+    other_id = app_client.post(
+        "/batches", json={"name": "Other Step Batch", "status": "fermenting"}, headers=headers
+    ).json()["id"]
+    response = app_client.post(
+        f"/batches/{batch_id}/fermentation-steps",
+        json=_steps(other_id), headers=headers,
+    )
+    assert response.status_code == 201
+    assert all(step["batchId"] == batch_id for step in response.json())
+    assert app_client.get(f"/batches/{other_id}/fermentation-steps", headers=headers).json() == []
 
 
 def test_create_fermentation_steps_replaces_existing(app_client):

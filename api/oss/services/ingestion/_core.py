@@ -140,7 +140,7 @@ class _IngestionCoreMixin:  # pylint: disable=too-many-instance-attributes
         logger.info("Auto-creating batch for device id=%s", device.id)
         is_pressure = device_type == "pressuremon"
         create_data = BatchCreate(
-            name=device.name or f"Batch for {device.id}",
+            name=f"New batch for device {device.name or device.id}",
             description="Automatically created",
             brew_date=datetime.today().date(),
             accept_ingest=True,

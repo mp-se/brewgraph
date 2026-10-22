@@ -270,6 +270,34 @@ def test_auto_creates_batch(app_client):
     assert len(data) == 1
 
 
+def test_auto_created_batch_is_named_after_device_name(app_client):
+    """The auto-created batch reads as a batch, not as the device itself."""
+    test_init()
+    device = _create_device(
+        app_client,
+        {"name": "Test AutoBatch", "deviceType": "gravitymon", "chipId": "NOBAT2"},
+    )
+    payload = {**GRAVITY_PAYLOAD, "ID": "NOBAT2", "token": device["token"]}
+    assert app_client.post("/ingest/gravitymon", json=payload).status_code == 200
+
+    r = app_client.get(f"/batches/?deviceId={device['id']}", headers=headers)
+    assert json.loads(r.text)["items"][0]["name"] == "New batch for device Test AutoBatch"
+
+
+def test_auto_created_batch_of_unnamed_device_uses_device_id(app_client):
+    """A device without a name falls back to its id in the batch name."""
+    test_init()
+    device = _create_device(
+        app_client,
+        {"name": "", "deviceType": "gravitymon", "chipId": "NOBAT3"},
+    )
+    payload = {**GRAVITY_PAYLOAD, "ID": "NOBAT3", "token": device["token"]}
+    assert app_client.post("/ingest/gravitymon", json=payload).status_code == 200
+
+    r = app_client.get(f"/batches/?deviceId={device['id']}", headers=headers)
+    assert json.loads(r.text)["items"][0]["name"] == f"New batch for device {device['id']}"
+
+
 def test_ingest_to_archived_batch_auto_creates_new_batch(app_client):
     """A device assigned to an archived batch does not keep appending readings
     to it — the assignment is treated as unset, same as a device with no
