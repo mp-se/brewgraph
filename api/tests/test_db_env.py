@@ -14,12 +14,20 @@ before `core.db` (see `tests/conftest.py`, which imports it first). If
 DATABASE_URL is unset, both `make run` and a bare `pytest` invocation would
 otherwise resolve to the same sqlite:///./brewgraph.sqlite file, letting a
 test run silently wipe dev data (`conftest.recreate_tables()` drops every
-table on session start). CI always sets DATABASE_URL explicitly (see
-`.github/workflows/ci.yaml`), so this default is local-only and never
-overrides an explicit setting.
+table on session start). The SQLite CI job and local runs use the isolated
+default. With pytest-xdist, each worker uses a separate file. Explicit
+DATABASE_URL values are refused for xdist so workers cannot drop or truncate
+each other's tables.
 """
 import os
 
 DEFAULT_TEST_DATABASE_URL = "sqlite:///./test_brewgraph.sqlite"
 
-os.environ.setdefault("DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
+worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+if worker_id:
+    configured_url = os.environ.get("DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
+    if configured_url != DEFAULT_TEST_DATABASE_URL:
+        raise RuntimeError("pytest-xdist requires the default isolated SQLite test database")
+    os.environ["DATABASE_URL"] = f"sqlite:///./test_brewgraph_{worker_id}.sqlite"
+else:
+    os.environ.setdefault("DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
