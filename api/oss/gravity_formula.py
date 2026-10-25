@@ -192,7 +192,15 @@ class _Parser:
     def unary(self):
         """Parse a unary sign before a power expression."""
         if self.peek() in ("+", "-"):
-            return ("u" + self.take(), self.unary())
+            sign = self.take()
+            operand = self.unary()
+            # A power ends in its exponent literal; a parenthesised group ends in ")".
+            if operand[0] == "^" and self.tokens[self.index - 1] != ")":
+                raise FormulaError(
+                    "a sign directly before a power is ambiguous; "
+                    "add parentheses: (-tilt)^2 or -(tilt^2)"
+                )
+            return ("u" + sign, operand)
         return self.power()
 
     def power(self):

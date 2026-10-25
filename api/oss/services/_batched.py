@@ -7,17 +7,7 @@
 # disclosure, a separate Commercial License is required.
 # See LICENSE for details.
 
-"""One query per relation instead of one per row.
-
-The dashboard is the only endpoint that reads every relation of every entity at
-once, and it was doing so a row at a time: roughly 2.8 queries per entity, 229 of
-them for a brewery with twenty of each thing. Each query was individually cheap
-and correctly indexed — the cost was the count.
-
-`ROW_NUMBER() OVER (PARTITION BY ...)` rather than `DISTINCT ON`: Postgres has the
-latter, SQLite and Oracle do not, and pytest runs SQLite while production runs
-Oracle.
-"""
+"""Fetch one row per owner with a window function on SQLite and PostgreSQL."""
 from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import Select, func, select

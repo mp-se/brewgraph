@@ -132,12 +132,7 @@ describe('backup mode — a snapshot of the database', () => {
   })
 
   it('stringifies an object config instead of embedding it raw', () => {
-    // The API's actual DeviceBase.config is Optional[Union[Dict[str, Any], str]] and
-    // returns a real object once a device's config has been fetched -- this repo's own
-    // SourceDevice type used to claim `string | null`, which was aspirational, not true.
-    // An un-stringified object here fails export-v1.schema.json's `nullableString`
-    // constraint on essentially every device that has a config. Regression for that gap
-    // (tasks/backlog.md, flagged 2026-09-12, not previously root-caused).
+    // Device configs can be objects; the export schema stores them as JSON strings.
     const devWithObjectConfig = { ...DEV, config: { sleep: 300, wifi: { ssid: 'brew' } } }
     const doc = buildExportDocument({ batches: [batch()], devices: [devWithObjectConfig], mode: 'backup' })
     expect(typeof doc.devices[0].config).toBe('string')

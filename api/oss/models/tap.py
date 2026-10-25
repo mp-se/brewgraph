@@ -46,8 +46,7 @@ class Tap(Base):
     # tap token and never carry a separate device identity to derive this from, so
     # the derivation this comment used to describe cannot happen. Do not build new
     # behavior on this column.
-    # use_alter breaks the tap/device/vessel FK cycle at DDL time, which Oracle requires
-    # and every other dialect tolerates. Matches Device's batch_id/vessel_id.
+    # use_alter breaks the tap/device/vessel foreign-key cycle at table creation.
     device_id = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("device.id", use_alter=True, name="fk_tap_device_id"),

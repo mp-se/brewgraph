@@ -15,10 +15,14 @@
     { "formula": "1.01 + (tilt - 15)^2 / 10000", "unit": "sg", "tilt": 15.01, "temp": 20, "gravitySg": 1.01000001 },
     { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 90, "temp": 20, "gravitySg": 1.1 },
     { "formula": "1.01 + tilt / 1000", "unit": "sg", "tilt": 89.99, "temp": 20, "gravitySg": 1.09999 },
-    { "formula": "1.025 + (temp - 20) / 1000", "unit": "sg", "tilt": 30, "temp": 25, "gravitySg": 1.03 }
+    { "formula": "1.025 + (temp - 20) / 1000", "unit": "sg", "tilt": 30, "temp": 25, "gravitySg": 1.03 },
+    { "formula": "1+(-tilt)^2/1000000", "unit": "sg", "tilt": 30, "temp": 20, "gravitySg": 1.0009 },
+    { "formula": "1+(-(tilt^2))/1000000", "unit": "sg", "tilt": 30, "temp": 20, "gravitySg": 0.9991 },
+    { "formula": "1-tilt^2/1000000", "unit": "sg", "tilt": 30, "temp": 20, "gravitySg": 0.9991 }
   ],
   "invalidFormula": [
-    "tilt + unknown", "__proto__", "constructor", "pi", "tilt^0", "tilt^7", "tilt^-1", "tilt^(2)", "tilt^temp", "1 +", "(tilt", "tilt;1", "",
+    "tilt + unknown", "__proto__", "constructor", "pi", "tilt^0", "tilt^7", "tilt^-1", "tilt^(2)", "tilt^temp",
+    "-tilt^2", "+tilt^2", "1+-tilt^2", "2*-tilt^2", "--tilt^2", "-(tilt)^2", "-(tilt+1)^2", "-(tilt^2)^2", "-2^2", "1 +", "(tilt", "tilt;1", "",
     "٣*0+1.01", "１+tilt", "0.٥", "1\u00a0+tilt", "1\u2003+tilt", "1\u200b+tilt", "tilt٣"
   ],
   "invalidReading": [

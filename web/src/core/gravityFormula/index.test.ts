@@ -28,6 +28,16 @@ describe('shared gravity formula vectors', () => {
   })
 })
 
+describe('sign before a power', () => {
+  it('names the parenthesised forms that are valid', () => {
+    expect(() => validateFormula('-tilt^2')).toThrow('ambiguous; add parentheses: (-tilt)^2 or -(tilt^2)')
+  })
+  it('keeps unambiguous signs valid', () => {
+    expect(evaluateFormula('1.1+(-(tilt^2))/10000', 30, 20, 'sg')).toBeCloseTo(1.01, 9)
+    expect(evaluateFormula('-8.1e-7*tilt^3+1.1', 30, 20, 'sg')).toBeCloseTo(1.07813, 9)
+  })
+})
+
 describe('shared exponent normalization vectors', () => {
   const { normalization } = vectors
   it.each(normalization.valid)('rewrites $input', vector => {

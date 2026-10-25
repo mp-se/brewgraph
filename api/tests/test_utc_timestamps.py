@@ -7,12 +7,7 @@
 # disclosure, a separate Commercial License is required.
 # See LICENSE for details.
 
-"""Every instant the API emits carries an explicit UTC marker.
-
-SQLite and the Oracle driver return naive datetimes for timezone-aware columns; the
-`UtcDateTime` column type re-attaches UTC so the JSON says `...Z`/`+00:00` and browsers
-do not read the value as local time.
-"""
+"""The API emits explicit UTC markers for SQLite timestamps."""
 import re
 from datetime import UTC, datetime, timedelta, timezone
 

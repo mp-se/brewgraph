@@ -129,11 +129,7 @@ class IngestionLogResponse(IngestionLogBase):
     """Full IngestionLog response with id and timestamp."""
     id: int
     created_at: datetime
-    # Overrides the base's `str` (default="") — Oracle silently stores an inserted empty
-    # string as NULL for VARCHAR2 columns (a longstanding Oracle-specific behavior, absent
-    # on SQLite/Postgres), so a row written with device_type="" reads back as None here.
-    # The column is nullable=True already; this just makes the response schema honest
-    # about it instead of rejecting a value the database itself produced.
+    # The database column is nullable, so the response accepts a missing device type.
     device_type: str | None = Field(default=None, max_length=12)
 
 

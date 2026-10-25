@@ -52,8 +52,7 @@ class IngestionLog(Base):
     # resolvable tenant by definition and must still be recorded.
     __tenant_nullable__ = True
 
-    # Identity(), not autoincrement=True: Oracle does not honour the latter and the
-    # INSERT fails with ORA-01400 on the PK. Matches SystemLog above.
+    # Identity() generates the key on every supported database.
     id = mapped_column(Integer, Identity(), primary_key=True)
     tenant_id = mapped_column(Uuid(as_uuid=True), nullable=True, default=None)
     device_id = mapped_column(Uuid(as_uuid=True), nullable=True, default=None)

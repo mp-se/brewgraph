@@ -39,8 +39,7 @@ class Device(Base):
 
     id = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = mapped_column(Uuid(as_uuid=True), nullable=False, default=DEFAULT_TENANT_ID)
-    # Nullable, and no empty-string default: Oracle stores '' as NULL, so a NOT NULL
-    # column defended only by default="" inserts NULL and violates its own constraint.
+    # An omitted name is stored as NULL, so this column allows NULL.
     name = mapped_column(String(60), nullable=True, default=None)
     chip_id = mapped_column(String(32), nullable=True, default=None)
     # Plaintext token; ingest verifies it directly.
@@ -80,8 +79,7 @@ class Device(Base):
     # HMAC-SHA256 of the origin IP, overwritten on every successful ingest write — a snapshot
     # of the latest origin, not a history.
     last_ingest_ip_hash = mapped_column(String(64), nullable=True, default=None, index=True)
-    # use_alter breaks the batch/device/vessel/tap FK cycle at DDL time, which Oracle requires
-    # and every other dialect tolerates.
+    # use_alter breaks the batch/device/vessel/tap foreign-key cycle at table creation.
     batch_id = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("batch.id", use_alter=True, name="fk_device_batch_id"),

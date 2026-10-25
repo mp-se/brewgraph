@@ -128,7 +128,15 @@ class Parser {
     return node
   }
   unary(): Node {
-    if (this.peek() === '+' || this.peek() === '-') return { op: `u${this.take()}` as 'u+' | 'u-', child: this.unary() }
+    if (this.peek() === '+' || this.peek() === '-') {
+      const op = `u${this.take()}` as 'u+' | 'u-'
+      const child = this.unary()
+      // A power ends in its exponent literal; a parenthesised group ends in ")".
+      if (child.op === '^' && this.tokens[this.index - 1] !== ')') {
+        throw new FormulaError('A sign directly before a power is ambiguous; add parentheses: (-tilt)^2 or -(tilt^2)')
+      }
+      return { op, child }
+    }
     return this.power()
   }
   power(): Node {

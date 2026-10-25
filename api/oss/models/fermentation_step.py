@@ -41,8 +41,7 @@ class FermentationStep(Base):
         Uuid(as_uuid=True), ForeignKey("device.id"), nullable=True, default=None
     )
     order = mapped_column(Integer, nullable=False, default=0)
-    # Nullable, and no empty-string default: Oracle stores '' as NULL, so a NOT NULL
-    # column defended only by default="" inserts NULL and violates its own constraint.
+    # An omitted type is stored as NULL, so this column allows NULL.
     type = mapped_column(String(30), nullable=True, default=None)
     name = mapped_column(String(30), nullable=True, default=None)
     temp = mapped_column(Float, nullable=False, default=0.0)

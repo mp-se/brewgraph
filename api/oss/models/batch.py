@@ -31,8 +31,7 @@ class Batch(Base):
 
     id = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = mapped_column(Uuid(as_uuid=True), nullable=False, default=DEFAULT_TENANT_ID)
-    # Nullable, and no empty-string default: Oracle stores '' as NULL, so a NOT NULL
-    # column defended only by default="" inserts NULL and violates its own constraint.
+    # An omitted name is stored as NULL, so this column allows NULL.
     name = mapped_column(String(60), nullable=True, default=None)
     description = mapped_column(String(200), nullable=True, default=None)
     accept_ingest = mapped_column(Boolean, nullable=False, default=True)

@@ -1,43 +1,6 @@
 # Copyright (c) 2024-2026 Magnus Persson. All rights reserved.
 # Commercial License is required for commercial use of this software.
-"""Chart downsampling — bounds what a chart endpoint puts on the wire.
-
-Chart endpoints returned every matching row. A three-week fermentation logging
-every 15 minutes is ~2,000 points; a two-year retention window is far more, and
-all of it was serialised to draw a line a few hundred pixels wide. The
-`resolution` parameter existed on all four chart services and was discarded
-(`_ = resolution`) in every one of them.
-
-Two reductions, applied in this order:
-
-1. **`resolution`** — `raw` keeps every point; `hourly`/`daily` keep the first
-   point in each bucket. This is the caller asking for a coarser series.
-2. **LTTB** — Largest-Triangle-Three-Buckets. Applied when the series still
-   exceeds `LTTB_THRESHOLD`, reducing to `MAX_POINTS`. This is the endpoint
-   refusing to emit an unbounded response regardless of what was asked for.
-
-**Why this is not the `DISTINCT ON (date_trunc(...))` the spec used to
-prescribe.** `DISTINCT ON` is PostgreSQL-only, and this application is expected
-to run on Oracle and SQLite as well as Postgres. Postgres-shaped SQL reaching an
-Oracle deployment has repeatedly been a source of bugs here. `date_trunc`
-itself is equally dialect-specific — Oracle spells it `TRUNC(ts, 'HH')`, SQLite
-needs `strftime`. Pushing the bucketing down would mean a dialect dispatch in
-the service layer, where none currently exists.
-
-It also would not have helped as much as it appears: LTTB has to see every
-candidate point to choose between them, so the rows are loaded either way. The
-payload — which is the actual defect — is bounded here just as effectively.
-
-DB-side pushdown for the `hourly`/`daily` paths remains a worthwhile
-optimisation if these series ever get large enough to make the fetch itself the
-cost. It needs a portable truncation helper first; `ROW_NUMBER() OVER (PARTITION
-BY ...)` works on all three backends where `DISTINCT ON` does not.
-
-**LTTB picks real points — it never synthesises one.** Every returned item is an
-object the caller passed in, so per-point fields the chart schema carries
-(velocity, temperature, temp_type) survive untouched. That is why this operates
-on opaque objects plus accessor functions rather than on (x, y) tuples.
-"""
+"""Bound chart responses by bucketing rows and selecting actual points with LTTB."""
 from datetime import datetime
 from typing import Callable, List, Optional, Sequence, TypeVar
 

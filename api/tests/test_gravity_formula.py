@@ -36,6 +36,19 @@ def test_invalid_formula_vectors(formula):
         validate_formula(formula)
 
 
+def test_sign_before_power_error_names_the_fix():
+    """The rejection tells the user which parenthesised forms are valid."""
+    message = r"ambiguous; add parentheses: \(-tilt\)\^2 or -\(tilt\^2\)"
+    with pytest.raises(FormulaError, match=message):
+        validate_formula("-tilt^2")
+
+
+def test_parenthesised_and_polynomial_signs_stay_valid():
+    """A sign in front of a group or a product, or a binary minus, is unambiguous."""
+    assert evaluate_formula("1.1-(tilt^2)/10000", 30, 20, "sg") == pytest.approx(1.01)
+    assert evaluate_formula("-8.1e-7*tilt^3+1.1", 30, 20, "sg") == pytest.approx(1.07813)
+
+
 NORMALIZATION = VECTORS["normalization"]
 
 

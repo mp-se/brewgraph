@@ -6,8 +6,8 @@ COPY display/ ./
 ARG GIT_HASH=unknown
 RUN VITE_APP_BUILD=${GIT_HASH} npm run build
 
-FROM nginx:1.30-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94 AS runtime
-RUN apk upgrade --no-cache
+FROM nginx:1.30.6-alpine AS runtime
+RUN apk upgrade --no-cache && apk add --no-cache 'nginx>=1.30.6-r0'
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY display/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

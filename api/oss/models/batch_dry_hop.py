@@ -32,7 +32,7 @@ class BatchDryHop(Base):
     batch_id = mapped_column(
         Uuid(as_uuid=True), ForeignKey("batch.id"), nullable=False
     )
-    # Nullable, and no empty-string default: Oracle stores '' as NULL (see Device.name).
+    # An omitted name is stored as NULL, so this column allows NULL.
     name = mapped_column(String(60), nullable=True, default=None)
     amount = mapped_column(Float, nullable=False)
     trigger_method = mapped_column(String(30), nullable=False, default="hours_before_completion")
