@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { describeFormulaFill, FORMULA_NOT_APPLIED, fillFormulaFromConfig } from '../deviceConfigFormula'
 import { buildDeviceEntry } from '../exportDocument'

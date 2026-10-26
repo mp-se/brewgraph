@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 /** Correctly-rounded numeric input step for a decimal precision. */
 export function decimalStep(decimals: number): number {
   return Number(`1e-${decimals}`)

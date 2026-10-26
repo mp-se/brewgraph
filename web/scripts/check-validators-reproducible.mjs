@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+/*
  * CI reproducibility check for build-validators.mjs.
  *
  * `src/modules/backup/generated/` is gitignored on the premise that it is a

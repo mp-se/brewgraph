@@ -1,3 +1,12 @@
+# Copyright (c) 2024-2026 Magnus Persson
+# SPDX-License-Identifier: GPL-3.0-only
+# BrewGraph — https://github.com/mp-se/brewgraph
+#
+# This file is part of BrewGraph. For open source use it is licensed under
+# the GNU General Public License v3.0. For commercial use without source
+# disclosure, a separate Commercial License is required.
+# See LICENSE for details.
+
 """`recipe_cost` must reach the wire as a JSON number, not a string.
 
 `recipe_cost` is `Numeric(10, 2)` in the column and `Decimal` in Python, which is

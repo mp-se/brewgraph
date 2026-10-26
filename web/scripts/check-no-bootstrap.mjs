@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 

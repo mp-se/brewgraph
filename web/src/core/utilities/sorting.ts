@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 export type SortType = 'str' | 'num' | 'date'
 
 export interface SortState {

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 /** Framework-independent text and elapsed-time helpers. */
 export interface LocalTimestampParts {
   date: string

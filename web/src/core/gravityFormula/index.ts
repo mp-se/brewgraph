@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 /** Framework-neutral, bounded gravity-formula language and calibration tools. */
 import { gravityToPlato, platoToGravity } from '../calculations/units'
 

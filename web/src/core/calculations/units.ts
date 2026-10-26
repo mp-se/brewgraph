@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 /** Framework-neutral brewing calculations and unit conversions. */
 
 export function gravityToPlato(specificGravity: number): number {

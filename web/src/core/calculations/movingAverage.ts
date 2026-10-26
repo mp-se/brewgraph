@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 /** Incremental simple moving-average filter for numeric telemetry. */
 export class MovingAverageFilter {
   /** Current samples; public for compatibility with existing diagnostic consumers. */

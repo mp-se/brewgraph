@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+/*
  * Precompile the backup/restore JSON schemas into standalone validator modules.
  *
  * Why this exists: ajv's `compile()` builds its validator by generating JavaScript

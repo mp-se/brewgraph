@@ -1,3 +1,14 @@
+<!--
+  Copyright (c) 2024-2026 Magnus Persson
+  SPDX-License-Identifier: GPL-3.0-only
+  BrewGraph — https://github.com/mp-se/brewgraph
+
+  This file is part of BrewGraph. For open source use it is licensed under
+  the GNU General Public License v3.0. For commercial use without source
+  disclosure, a separate Commercial License is required.
+  See LICENSE for details.
+-->
+
 <!-- Shared editor UX; calculations and validation live in the framework-neutral core. -->
 <template>
   <q-card class="gravity-formula-editor q-mb-md" data-testid="gravity-formula-editor">

@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 import { defineComponent, getCurrentInstance, h, ref, isVNode, type Component, type VNode, type VNodeChild } from 'vue'
 import { QBanner, QBtn, QBtnDropdown, QCard, QCardActions, QCardSection, QDialog, QFile, QInput, QLinearProgress, QOptionGroup, QSelect, QToggle } from 'quasar'
 

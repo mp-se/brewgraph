@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 export const TEMPERATURE_FORMAT_C = 'C'
 export const TEMPERATURE_FORMAT_F = 'F'
 export const GRAVITY_FORMAT_SG = 'SG'

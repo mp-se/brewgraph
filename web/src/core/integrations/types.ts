@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 export const INTEGRATION_TYPE_ISPINDEL_FORWARD = 'ispindel_forward'
 export const INTEGRATION_TYPE_BREWFATHER_FORWARD = 'brewfather_forward'
 export const INTEGRATION_TYPE_CUSTOM_FORWARD = 'custom_forward'

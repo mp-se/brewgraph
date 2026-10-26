@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 

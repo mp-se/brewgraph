@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 import js from '@eslint/js';
 import pluginVue from 'eslint-plugin-vue';
 import tsPlugin from '@typescript-eslint/eslint-plugin';

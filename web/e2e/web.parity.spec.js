@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2024-2026 Magnus Persson
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
+/*
  * Read-only browser comparison between the preserved legacy and active Quasar frontends.
  * Both clients must point to the same local API data. This test does not submit forms,
  * confirm deletes, save settings, or otherwise mutate server data.
