@@ -1,3 +1,8 @@
+![Docker Pulls](https://img.shields.io/docker/pulls/mpse2/brewgraph-api)
+![release](https://img.shields.io/github/v/release/mp-se/brewgraph?label=latest%20release)
+![issues](https://img.shields.io/github/issues/mp-se/brewgraph)
+![pr](https://img.shields.io/github/issues-pr/mp-se/brewgraph)
+
 # BrewGraph
 
 Self-hosted homebrewing telemetry platform. Ingests gravity and pressure readings from physical sensors and tracks batches through their full lifecycle — fermenting → conditioning → kegged or bottled.
