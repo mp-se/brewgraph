@@ -13,9 +13,9 @@ from ._core import _IngestionCoreMixin
 from ._gravity import _GravityIngestionMixin
 from ._pour import _PourIngestionMixin
 from ._pressure import _PressureIngestionMixin
-from ._utils import _safe_float
+from ._utils import UnstorableValueError, _safe_float
 
-__all__ = ["IngestionService", "_safe_float"]
+__all__ = ["IngestionService", "UnstorableValueError", "_safe_float"]
 
 
 class IngestionService(

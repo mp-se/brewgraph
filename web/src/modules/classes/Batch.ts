@@ -21,7 +21,8 @@ interface BatchParams {
   brewDate?: string
   style?: string
   brewer?: string
-  abv?: number
+  abv?: number | null
+  abvMeasured?: number | null
   ebc?: number | null
   ibu?: number | null
   fg?: number | null
@@ -61,7 +62,8 @@ export class Batch {
   private _brewDate: string
   private _style: string
   private _brewer: string
-  private _abv: number
+  private _abv: number | null
+  private _abvMeasured: number | null
   private _ebc: number | null
   private _ibu: number | null
   private _fg: number | null
@@ -100,7 +102,8 @@ export class Batch {
     brewDate = '',
     style = '',
     brewer = '',
-    abv = 0,
+    abv = null,
+    abvMeasured = null,
     ebc = null,
     ibu = null,
     fg = null,
@@ -139,6 +142,7 @@ export class Batch {
     this._style = style
     this._brewer = brewer
     this._abv = abv
+    this._abvMeasured = abvMeasured
     this._ebc = ebc
     this._ibu = ibu
     this._fg = fg
@@ -203,7 +207,8 @@ export class Batch {
       brewDate: (b.brewDate as string) ?? '',
       style: (b.style as string) ?? '',
       brewer: (b.brewer as string) ?? '',
-      abv: (b.abv as number) ?? 0,
+      abv: (b.abv as number | null) ?? null,
+      abvMeasured: (b.abvMeasured as number | null) ?? null,
       ebc: (b.ebc as number | null) ?? null,
       ibu: (b.ibu as number | null) ?? null,
       fg: (b.fg as number | null) ?? null,
@@ -302,6 +307,9 @@ export class Batch {
   }
   get abv() {
     return this._abv
+  }
+  get abvMeasured() {
+    return this._abvMeasured
   }
   get ebc() {
     return this._ebc
@@ -419,7 +427,7 @@ export class Batch {
   set brewer(v: string) {
     this._brewer = v
   }
-  set abv(v: number) {
+  set abv(v: number | null) {
     this._abv = v
   }
   set ebc(v: number | null) {

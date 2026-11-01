@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Chart, registerables } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
 import 'date-fns'
@@ -170,7 +170,8 @@ import router from '@/modules/router'
 import { logDebug, logError } from '@/ui'
 import { localDateEnd, localDateStart, localTimestampParts, shiftLocalDate } from '@/core'
 
-let chart = null // Do not use ref for this, will cause stack overflow...
+let chart = null // Chart instances stay outside Vue reactivity.
+onBeforeUnmount(() => chart?.destroy())
 
 Chart.register(...registerables, zoomPlugin)
 
@@ -298,6 +299,7 @@ function mapPressureData(pList) {
   const result = []
 
   pList.forEach((p) => {
+    if (p.pressure === null) return // a reading without pressure leaves a gap
     result.push({
       x: p.created,
       y: parseFloat(

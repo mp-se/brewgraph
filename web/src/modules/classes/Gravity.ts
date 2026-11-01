@@ -12,10 +12,11 @@
 interface GravityParams {
   id?: number
   temperature?: number | null
-  gravity?: number
+  gravity?: number | null
   velocity?: number | null
   angle?: number | null
   battery?: number | null
+  batteryPercent?: number | null
   rssi?: number | null
   runTime?: number | null
   excluded?: boolean
@@ -27,10 +28,11 @@ interface GravityParams {
 export class Gravity {
   private _id: number
   private _temperature: number | null
-  private _gravity: number
+  private _gravity: number | null
   private _velocity: number | null
   private _angle: number | null
   private _battery: number | null
+  private _batteryPercent: number | null
   private _rssi: number | null
   private _runTime: number | null
   private _excluded: boolean
@@ -41,10 +43,11 @@ export class Gravity {
   constructor({
     id = 0,
     temperature = null,
-    gravity = 0.0,
+    gravity = null,
     velocity = null,
     angle = null,
     battery = null,
+    batteryPercent = null,
     rssi = null,
     runTime = null,
     excluded = false,
@@ -54,10 +57,11 @@ export class Gravity {
   }: GravityParams = {}) {
     this._id = id
     this._temperature = temperature ?? null
-    this._gravity = gravity ?? 0.0
+    this._gravity = gravity ?? null
     this._velocity = velocity ?? null
     this._angle = angle ?? null
     this._battery = battery ?? null
+    this._batteryPercent = batteryPercent ?? null
     this._rssi = rssi ?? null
     this._runTime = runTime ?? null
     this._excluded = excluded ?? false
@@ -70,10 +74,11 @@ export class Gravity {
     return new Gravity({
       id: g.id as number,
       temperature: (g.temperature as number | null) ?? null,
-      gravity: g.gravity as number,
+      gravity: (g.gravity as number | null) ?? null,
       velocity: (g.velocity as number | null) ?? null,
       angle: (g.angle as number | null) ?? null,
       battery: (g.battery as number | null) ?? null,
+      batteryPercent: (g.batteryPercent as number | null) ?? null,
       rssi: (g.rssi as number | null) ?? null,
       runTime: (g.runTime as number | null) ?? null,
       excluded: (g.excluded as boolean) ?? false,
@@ -90,6 +95,7 @@ export class Gravity {
       velocity: this.velocity,
       angle: this.angle,
       battery: this.battery,
+      batteryPercent: this.batteryPercent,
       rssi: this.rssi,
       runTime: this.runTime,
       excluded: this.excluded
@@ -113,6 +119,9 @@ export class Gravity {
   }
   get battery() {
     return this._battery
+  }
+  get batteryPercent() {
+    return this._batteryPercent
   }
   get rssi() {
     return this._rssi
@@ -142,7 +151,7 @@ export class Gravity {
   set temperature(v: number | null) {
     this._temperature = v
   }
-  set gravity(v: number) {
+  set gravity(v: number | null) {
     this._gravity = v
   }
   set velocity(v: number | null) {
@@ -153,6 +162,9 @@ export class Gravity {
   }
   set battery(v: number | null) {
     this._battery = v
+  }
+  set batteryPercent(v: number | null) {
+    this._batteryPercent = v
   }
   set rssi(v: number | null) {
     this._rssi = v

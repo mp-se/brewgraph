@@ -30,6 +30,7 @@ class TempReadingCreate(BaseModel):
     # battery is volts, not a percentage — nullable because the one device type
     # writing this table today (chamber_controller) is mains-powered and sends none.
     battery: Optional[float] = Field(default=None, ge=0.0, le=10.0)
+    battery_percent: Optional[float] = Field(default=None, allow_inf_nan=False)
     rssi: Optional[float] = Field(default=None, ge=-200, le=0)
     # Validated against the enum, stored as a string -- same pattern as device_type,
     # so a new placement needs no migration.
@@ -39,8 +40,20 @@ class TempReadingCreate(BaseModel):
     created_at: Optional[datetime] = None
 
     _quantise_temperature = quantised("temperature", quantity="temperature")
-    _quantise_battery = quantised("battery", quantity="battery")
     _quantise_rssi = quantised("rssi", quantity="signal")
+
+
+class TempReadingIngest(TempReadingCreate):
+    """A temperature reading written by a device: stored exactly as received.
+
+    Ingestion applies no range to a measurement, so this schema keeps the field types of
+    ``TempReadingCreate`` and drops its bounds, which belong to readings entered by hand.
+    """
+
+    temperature: float
+    battery: Optional[float] = None
+    battery_percent: Optional[float] = Field(default=None, allow_inf_nan=False)
+    rssi: Optional[float] = None
 
 
 class TempReadingUpdate(BaseModel):
@@ -58,17 +71,20 @@ class TempReadingUpdate(BaseModel):
 
     temperature: Optional[float] = Field(default=None, ge=-270.0, le=200.0)
     battery: Optional[float] = Field(default=None, ge=0.0, le=10.0)
+    battery_percent: Optional[float] = Field(default=None, allow_inf_nan=False)
     rssi: Optional[float] = Field(default=None, ge=-200, le=0)
     temp_type: Optional[TempType] = None
     excluded: Optional[bool] = None
 
     _quantise_temperature = quantised("temperature", quantity="temperature")
-    _quantise_battery = quantised("battery", quantity="battery")
     _quantise_rssi = quantised("rssi", quantity="signal")
 
 
-class TempReadingResponse(TempReadingCreate):
-    """Full temperature reading response including DB-assigned fields."""
+class TempReadingResponse(TempReadingIngest):
+    """Full temperature reading response including DB-assigned fields.
+
+    Unbounded like the ingest schema: a reading is returned exactly as it was stored.
+    """
 
     id: int
 

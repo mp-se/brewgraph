@@ -618,6 +618,54 @@ describe('utils.js - Unit Conversions', () => {
       expect(result.temperature.min).toBeGreaterThan(-270)
     })
 
+    it('skips readings without pressure in min and max', () => {
+      const now = new Date()
+      const result = getPressureDataAnalytics([
+        { pressure: null, temperature: 20, createdAt: now.toISOString() },
+        { pressure: 12, temperature: 20, createdAt: new Date(now.getTime() + 60000).toISOString() }
+      ])
+
+      expect(result.pressure.min).toBe(result.pressure.max)
+      expect(Number.isFinite(result.pressure.min)).toBe(true)
+    })
+
+    it('gives zero stats when no reading has a pressure', () => {
+      const result = getPressureDataAnalytics([
+        { pressure: null, temperature: 20, createdAt: new Date().toISOString() }
+      ])
+
+      expect(Number.isFinite(result.pressure.min)).toBe(true)
+      expect(Number.isFinite(result.pressure.max)).toBe(true)
+    })
+
+    it('shows -- for a reading without pressure', () => {
+      expect(getFormattedPressure(null)).toBe('--')
+      expect(getFormattedPressure(undefined)).toBe('--')
+    })
+
+    it('keeps the sign of negative readings in min and max', () => {
+      const now = new Date()
+      const result = getPressureDataAnalytics([
+        { pressure: -3, temperature: 20, createdAt: now.toISOString() },
+        { pressure: -1, temperature: 20, createdAt: new Date(now.getTime() + 60000).toISOString() }
+      ])
+
+      expect(result.pressure.min).toBeLessThan(result.pressure.max)
+      expect(result.pressure.max).toBeLessThan(0)
+      expect(result.pressure.minString.startsWith('-')).toBe(true)
+    })
+
+    it('reports readings above the old seed value as the minimum', () => {
+      const now = new Date()
+      const result = getPressureDataAnalytics([
+        { pressure: 5, temperature: 20, createdAt: now.toISOString() },
+        { pressure: 9, temperature: 20, createdAt: new Date(now.getTime() + 60000).toISOString() }
+      ])
+
+      expect(result.pressure.min).toBeGreaterThan(0)
+      expect(result.pressure.min).toBeLessThan(result.pressure.max)
+    })
+
     it('should handle empty pressure list', () => {
       const result = getPressureDataAnalytics([])
 

@@ -16,6 +16,7 @@ from fastapi import Depends
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict
 
+from core.enums import DeviceType
 from oss.extensions.auth import oss_auth_provider as api_key_auth
 from oss.extensions.retention import \
     oss_retention_provider as get_retention_cutoff
@@ -37,6 +38,34 @@ from oss.services.tap import TapService
 from oss.services.temp_reading import TempService
 
 logger = logging.getLogger(__name__)
+
+_GRAVITY_TYPES = {DeviceType.ISPINDEL.value, DeviceType.GRAVITYMON.value,
+                  DeviceType.GRAVITYMON_GATEWAY.value}
+_PRESSURE_TYPES = {DeviceType.PRESSUREMON.value}
+
+
+def _reading_source(device: Any) -> Optional[str]:
+    """Which reading table feeds a device's latest reading.
+
+    Gravity and pressure devices are decided by type; `batch_role` (null while the
+    device is assigned to a storage vessel) decides for the rest. A chamber
+    controller without a role reads its temperature readings.
+    """
+    device_type = getattr(device.device_type, "value", device.device_type)
+    if device_type in _GRAVITY_TYPES:
+        return "gravity"
+    if device_type in _PRESSURE_TYPES:
+        return "pressure"
+    role = getattr(device.batch_role, "value", device.batch_role)
+    if role == "gravity":
+        return "gravity"
+    if role in ("pressure", "chamber"):
+        return "pressure"
+    if role == "temp" or device_type == DeviceType.CHAMBER_CONTROLLER.value:
+        return "temp"
+    return None
+
+
 router = APIRouter(prefix="/api", tags=["dashboard"], dependencies=[Depends(api_key_auth)])
 
 
@@ -76,6 +105,7 @@ class DashboardBatch(DashboardBatchBase):
     # a pressure-only or temp-only batch must retain a meaningful measurement timeline.
     first_reading_at: Optional[datetime] = None
     battery: Optional[float] = None
+    battery_percent: Optional[float] = None
     rssi: Optional[float] = None
     last_reading_at: Optional[datetime] = None
 
@@ -123,11 +153,15 @@ async def get_dashboard(  # pylint: disable=too-many-arguments,too-many-position
     devices = device_service.list()
     device_ids = [d.id for d in devices]
     # One query per relation, not one per device: see oss/services/_batched.py.
+    sources = {d.id: _reading_source(d) for d in devices}
     device_gravity = gravity_service.latest_for_devices(
-        [d.id for d in devices if d.batch_role == "gravity"]
+        [i for i, s in sources.items() if s == "gravity"]
     )
     device_pressure = pressure_service.latest_for_devices(
-        [d.id for d in devices if d.batch_role in ("pressure", "chamber")]
+        [i for i, s in sources.items() if s == "pressure"]
+    )
+    device_temp = temp_service.latest_for_devices(
+        [i for i, s in sources.items() if s == "temp"]
     )
     device_predictions = prediction_service.latest_for_owners(
         Prediction.device_id, device_ids
@@ -135,7 +169,8 @@ async def get_dashboard(  # pylint: disable=too-many-arguments,too-many-position
     dashboard_devices: List[DashboardDevice] = []
     for d in devices:
         latest: Optional[LatestReading] = None
-        if d.batch_role == "gravity":
+        source = sources[d.id]
+        if source == "gravity":
             r = device_gravity.get(d.id)
             if r:
                 latest = LatestReading(
@@ -143,16 +178,28 @@ async def get_dashboard(  # pylint: disable=too-many-arguments,too-many-position
                     angle=r.angle,
                     temperature=r.temperature,
                     battery=r.battery,
+                    battery_percent=r.battery_percent,
                     rssi=r.rssi,
                     recorded_at=r.created_at,
                 )
-        elif d.batch_role in ("pressure", "chamber"):
+        elif source == "pressure":
             r = device_pressure.get(d.id)
             if r:
                 latest = LatestReading(
                     pressure=r.pressure,
                     temperature=r.temperature,
                     battery=r.battery,
+                    battery_percent=r.battery_percent,
+                    rssi=r.rssi,
+                    recorded_at=r.created_at,
+                )
+        elif source == "temp":
+            r = device_temp.get(d.id)
+            if r:
+                latest = LatestReading(
+                    temperature=r.temperature,
+                    battery=r.battery,
+                    battery_percent=r.battery_percent,
                     rssi=r.rssi,
                     recorded_at=r.created_at,
                 )
@@ -245,6 +292,7 @@ async def get_dashboard(  # pylint: disable=too-many-arguments,too-many-position
             temp_device_id=b.temp_device_id,
             first_reading_at=first_measurement.created_at if first_measurement else None,
             battery=freshest.battery if freshest else None,
+            battery_percent=freshest.battery_percent if freshest else None,
             rssi=freshest.rssi if freshest else None,
             last_reading_at=freshest.created_at if freshest else None,
             gravity_count=g_count,

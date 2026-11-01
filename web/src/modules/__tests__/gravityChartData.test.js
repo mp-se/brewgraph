@@ -156,6 +156,18 @@ describe('gravityChartData', () => {
       expect(result[0].y).toBe(4.12)
     })
 
+    it('should skip readings without a battery value instead of plotting zero volts', () => {
+      const gList = [
+        { created: '2024-01-01T10:00:00Z', battery: null },
+        { created: '2024-01-01T11:00:00Z' },
+        { created: '2024-01-01T12:00:00Z', battery: 3.9 }
+      ]
+
+      const result = mapBatteryData(gList)
+
+      expect(result).toEqual([{ x: '2024-01-01T12:00:00Z', y: 3.9 }])
+    })
+
     it('should handle empty list', () => {
       const result = mapBatteryData([])
 

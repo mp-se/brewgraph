@@ -39,9 +39,8 @@ DECIMALS = {
     "mass": 1,           # grams -- finer than any brewing scale resolves
     "pressure": 2,       # kPa -- below the sensors' noise floor
     "gravity": 4,        # SG -- one point of gravity is 0.001
-    "battery": 2,        # volts -- the ADC does not justify more
     "signal": 0,         # dBm -- an integer quantity, float only for column uniformity
-    "percent": 1,        # ABV / SoC
+    "percent": 1,        # ABV
     # money -- NOT for an amount payable: currency minor units genuinely differ
     # (JPY/KRW use 0, most use 2), so a single global precision would be wrong for
     # a value someone is charged. This entry is only for a *derived analytic ratio*

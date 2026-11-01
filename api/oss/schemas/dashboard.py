@@ -24,8 +24,8 @@ itself stays lean rather than carrying them.
 directly from these subclasses, so a shared top-level model would only add indirection.
 
 A future field belongs on the relevant `*Base` class here if broadly useful, or on a
-subclass if it's specific to one feature area — exactly like `battery_soc` and
-`last_pour_at`/`last_pour_amount` already are.
+subclass if it's specific to one feature area — exactly like `last_pour_at` and
+`last_pour_amount` already are.
 """
 import uuid
 from datetime import datetime
@@ -50,10 +50,9 @@ class LatestReadingBase(BaseModel):
     angle: Optional[float] = None
     pressure: Optional[float] = None
     temperature: Optional[float] = None
-    # Volts, as stored — see `oss/services/ingestion.py`. A percentage (`_soc`
-    # suffix) is a per-device-type addition, since the OCV curve lives with the
-    # device type definition, not here.
+    # Battery values are reported by the device and are never derived from one another.
     battery: Optional[float] = None
+    battery_percent: Optional[float] = None
     rssi: Optional[float] = None
     recorded_at: Optional[datetime] = None
 

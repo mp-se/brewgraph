@@ -43,10 +43,6 @@ class TestQuantise:
         """Gravity quantises to 4 decimals (one gravity point)."""
         assert quantise(1.050126, "gravity") == 1.0501
 
-    def test_battery_two_decimals(self):
-        """Battery voltage quantises to 2 decimals."""
-        assert quantise(3.847, "battery") == 3.85
-
     def test_signal_zero_decimals(self):
         """Signal strength quantises to a whole number."""
         assert quantise(-76.6, "signal") == -77.0
@@ -113,7 +109,7 @@ def test_ingest_quantises_fahrenheit_to_celsius_conversion(app_client):
     reading = gravity[0]
     # (68.111 - 32) * 5 / 9 = 20.0616... -> quantised to 2 decimals
     assert reading["temperature"] == round((68.111 - 32) * 5 / 9, 2)
-    assert reading["battery"] == 3.85
+    assert reading["battery"] == 3.85123
 
 
 def test_ingest_quantises_plato_to_sg_conversion(app_client):

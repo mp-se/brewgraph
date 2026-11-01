@@ -171,8 +171,5 @@ async def task_update_predictions() -> None:
 # wired to no scheduler job passes CI while doing nothing — the kind of dead code
 # that later gets mistaken for a working feature.
 #
-# The voltage→SoC conversion they used stays in oss/battery.py, which is a neutral
-# utility: anything reading the `battery` column can want a state of charge.
-#
 # If battery or connectivity prediction is wanted here, wire it to the scheduler
 # in the same change. Re-adding unreferenced helpers just recreates the situation.

@@ -15,7 +15,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from ._utils import PourEvent, StorageVessel, Tap, _safe_float
+from ._utils import PourEvent, StorageVessel, Tap, _required_float
 
 
 class _PourIngestionMixin:
@@ -31,6 +31,11 @@ class _PourIngestionMixin:
         """Return the currently tapped vessel for a tap, or None."""
         return self._tap_svc.find_active_vessel(tap.id)
 
+    @staticmethod
+    def _vessel_levels(payload: dict) -> tuple[float, float]:
+        """The reported ``(volume, maxVolume)``, each stored exactly as received."""
+        return _required_float(payload, "volume"), _required_float(payload, "maxVolume")
+
     def write_pour(self, tap: Tap, payload: dict) -> Optional[PourEvent]:
         """Apply an authoritative KegMon volume update and optionally record its pour."""
         event_id = payload.get("eventId") or payload.get("event_id")
@@ -44,12 +49,17 @@ class _PourIngestionMixin:
         if vessel is None:
             raise ValueError(f"No active vessel on tap id={tap.id}")
         previous = vessel.volume_remaining
-        volume = _safe_float(payload["volume"], default=0.0, lo=0.0, hi=30000.0)
-        vessel.total_volume = _safe_float(
-            payload["maxVolume"], default=vessel.total_volume, lo=0.0, hi=30000.0
-        )
+        volume, max_volume = self._vessel_levels(payload)
+        pour_reported = payload.get("pour") is not None
+        pour_amount = _required_float(payload, "pour") if pour_reported else None
+        # The volume is the authoritative current level, stored as received. A volume above
+        # the reported capacity raises the capacity to it, so volume_remaining <= total_volume
+        # still holds.
+        vessel.total_volume = max(max_volume, volume)
         vessel.volume_remaining = volume
-        if payload.get("pour") is None or volume >= previous:
+        # A pour with an event id is recorded whatever the level did; without one, only a
+        # level that moved down proves it is not a retry.
+        if not pour_reported or not (event_id or volume < previous):
             self._db.commit()
             return None
         event = PourEvent(
@@ -57,7 +67,7 @@ class _PourIngestionMixin:
             batch_id=vessel.batch_id,
             tap_id=tap.id,
             event_id=event_id,
-            pour_amount=_safe_float(payload["pour"], default=0.0, lo=0.0, hi=30000.0),
+            pour_amount=pour_amount,
             volume_remaining=volume,
             is_manual=False,
         )

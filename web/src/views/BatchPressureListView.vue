@@ -133,8 +133,8 @@
             </td>
             <td class="text-body1">{{ getFormattedPressure(p.pressure) }}</td>
             <td class="text-body1">{{ getFormattedTemperature(p.temperature) }}</td>
-            <td class="text-body1">{{ p.battery !== null ? new Number(p.battery).toFixed(2) : '--' }}</td>
-            <td class="text-body1">{{ p.rssi }}</td>
+            <td class="text-body1">{{ formatBattery(p.battery, p.batteryPercent) || '--' }}</td>
+            <td class="text-body1">{{ p.rssi !== null ? p.rssi : '--' }}</td>
             <td class="text-body1">{{ p.runTime !== null ? new Number(p.runTime).toFixed(2) : '--' }}</td>
           </tr>
         </tbody>
@@ -210,6 +210,7 @@ import {
   getFormattedTemperature,
   getFormattedPressure
 } from '@/modules/utils'
+import { formatBattery } from '@/modules/batteryDisplay'
 import { logDebug, logError } from '@/ui'
 import { formatLocalTimestamp, localDateEnd, localDateStart } from '@/core'
 import { usePagination } from '@/modules/usePagination'

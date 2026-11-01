@@ -17,17 +17,23 @@ describe('Gravity - Data Class', () => {
     it('should create a Gravity with default values', () => {
       const g = new Gravity()
       expect(g.id).toBe(0)
-      expect(g.gravity).toBe(0.0)
+      expect(g.gravity).toBeNull()
       expect(g.temperature).toBeNull()
       expect(g.velocity).toBeNull()
       expect(g.angle).toBeNull()
       expect(g.battery).toBeNull()
+      expect(g.batteryPercent).toBeNull()
       expect(g.rssi).toBeNull()
       expect(g.runTime).toBeNull()
       expect(g.excluded).toBe(false)
       expect(g.createdAt).toBe('')
       expect(g.batchId).toBe('')
       expect(g.deviceId).toBeNull()
+    })
+
+    it('keeps a missing gravity null instead of zero', () => {
+      expect(Gravity.fromJson({ id: 1, gravity: null, angle: 30 }).gravity).toBeNull()
+      expect(Gravity.fromJson({ id: 2, angle: 30 }).gravity).toBeNull()
     })
 
     it('should use provided values', () => {
@@ -37,6 +43,7 @@ describe('Gravity - Data Class', () => {
         temperature: 20.0,
         angle: 34.5,
         battery: 3.8,
+        batteryPercent: 81.234,
         excluded: true
       })
       expect(g.id).toBe(5)
@@ -44,6 +51,7 @@ describe('Gravity - Data Class', () => {
       expect(g.temperature).toBe(20.0)
       expect(g.angle).toBe(34.5)
       expect(g.battery).toBe(3.8)
+      expect(g.batteryPercent).toBe(81.234)
       expect(g.excluded).toBe(true)
     })
 
@@ -64,6 +72,7 @@ describe('Gravity - Data Class', () => {
         velocity: 0.02,
         angle: 30.1,
         battery: 3.9,
+        batteryPercent: 86.123,
         rssi: -72.0,
         runTime: 1.2,
         excluded: false,
@@ -78,6 +87,7 @@ describe('Gravity - Data Class', () => {
       expect(g.velocity).toBe(0.02)
       expect(g.angle).toBe(30.1)
       expect(g.battery).toBe(3.9)
+      expect(g.batteryPercent).toBe(86.123)
       expect(g.rssi).toBe(-72.0)
       expect(g.runTime).toBe(1.2)
       expect(g.excluded).toBe(false)
@@ -91,6 +101,7 @@ describe('Gravity - Data Class', () => {
       expect(g.velocity).toBeNull()
       expect(g.angle).toBeNull()
       expect(g.battery).toBeNull()
+      expect(g.batteryPercent).toBeNull()
       expect(g.rssi).toBeNull()
       expect(g.runTime).toBeNull()
       expect(g.excluded).toBe(false)
@@ -106,6 +117,7 @@ describe('Gravity - Data Class', () => {
         temperature: 18.0,
         angle: 32.0,
         battery: 3.7,
+        batteryPercent: 72.5,
         rssi: -80,
         runTime: 0.9,
         excluded: true
@@ -115,6 +127,7 @@ describe('Gravity - Data Class', () => {
       expect(json.temperature).toBe(18.0)
       expect(json.angle).toBe(32.0)
       expect(json.battery).toBe(3.7)
+      expect(json.batteryPercent).toBe(72.5)
       expect(json.rssi).toBe(-80)
       expect(json.runTime).toBe(0.9)
       expect(json.excluded).toBe(true)
@@ -131,6 +144,7 @@ describe('Gravity - Data Class', () => {
       g.velocity = 0.05
       g.angle = 45.0
       g.battery = 4.0
+      g.batteryPercent = 88
       g.rssi = -60
       g.runTime = 2.0
       g.excluded = true

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Starting BrewGraph API v$(python3 -c 'from core.config import get_settings; print(get_settings().version)' 2>/dev/null || echo '2.0.0')"
+echo "Starting BrewGraph API v$(python3 -c 'from core.config import get_settings; print(get_settings().version)' 2>/dev/null || echo '0.9.0')"
 DB_DISPLAY=$(python3 -c "
 from urllib.parse import urlparse
 u = urlparse('${DATABASE_URL:-sqlite:////data/brewgraph.sqlite}')

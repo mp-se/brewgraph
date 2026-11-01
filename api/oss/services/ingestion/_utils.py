@@ -29,15 +29,57 @@ TempReading = resolve_model("TempReading")
 Tap = resolve_model("Tap")
 
 
-def _safe_float(value, default: float = 0.0, lo: float = -1e9, hi: float = 1e9) -> float:
-    """Convert value to float, clamping to [lo, hi] and replacing NaN/Inf with default."""
+class UnstorableValueError(ValueError):
+    """A received value that cannot be stored; the router answers it with a 422.
+
+    ``field`` names the offending payload field and ``cause`` says why in a few words,
+    never the value itself.
+    """
+
+    def __init__(self, field: str, cause: str):
+        super().__init__(f"{field}: {cause}")
+        self.field = field
+        self.cause = cause
+
+
+def _safe_float(value, default: Optional[float] = 0.0) -> Optional[float]:
+    """Convert value to a float as received; text, absent and NaN/Inf values give default.
+
+    There is no range: a measurement is stored exactly as the device sent it.
+    """
     try:
         f = float(value)
     except (TypeError, ValueError):
         return default
     if not math.isfinite(f):
         return default
-    return max(lo, min(hi, f))
+    return f
+
+
+def _optional_float(payload: dict, *keys: str) -> Optional[float]:
+    """The first of ``keys`` present in payload as a float; None when absent or unusable.
+
+    An optional measurement that was not sent is stored as null, never as zero.
+    """
+    for key in keys:
+        if payload.get(key) is not None:
+            return _safe_float(payload[key], default=None)
+    return None
+
+
+def _required_float(payload: dict, key: str) -> float:
+    """The primary value of a reading; a missing or non-finite one cannot be stored."""
+    value = _safe_float(payload.get(key), default=None)
+    if value is None:
+        raise UnstorableValueError(key, "missing or not a finite number")
+    return value
+
+
+def _finite(value: float, field: str) -> float:
+    """Guard a converted value: an unit conversion of a huge number may overflow."""
+    if not math.isfinite(value):
+        raise UnstorableValueError(field, "not a finite number after unit conversion")
+    return value
 
 
 def _payload_temperature(payload: dict) -> Optional[float]:
@@ -46,11 +88,8 @@ def _payload_temperature(payload: dict) -> Optional[float]:
     The unit is the wire contract's ``temp_units`` (``C`` or ``F``); the ingest
     schemas guarantee that key, so no alternate spellings are read here.
     """
-    raw = payload.get("temperature")
-    if raw is None:
-        return None
-    temperature = _safe_float(raw, default=None, lo=-270.0, hi=200.0)  # type: ignore[arg-type]
-    if temperature is None or temperature <= -270:
+    temperature = _optional_float(payload, "temperature")
+    if temperature is None:
         return None
     if payload.get("temp_units", "C").upper() == "F":
         temperature = quantise((temperature - 32) * 5 / 9, "temperature")

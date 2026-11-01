@@ -50,12 +50,12 @@ class TempReading(Base):
         Uuid(as_uuid=True), ForeignKey("device.id"), nullable=True, default=None
     )
     temperature = mapped_column(Float, nullable=False)
-    # battery is volts, not a percentage — see write_gravity's clamp in ingestion.py
-    # for why (1S lithium voltage bound). Nullable: chamber_controller is the only
+    # battery is volts, not a percentage. Nullable: chamber_controller is the only
     # device type writing this table today and it is mains-powered, so it reports
     # no battery — the column exists for parity with GravityReading/PressureReading
     # and any future battery-powered temp probe.
     battery = mapped_column(Float, nullable=True, default=None)
+    battery_percent = mapped_column(Float, nullable=True, default=None)
     rssi = mapped_column(Float, nullable=True, default=None)
     temp_type = mapped_column(String(10), nullable=False, default="beer")
     is_aggregate = mapped_column(Boolean, nullable=False, default=False)

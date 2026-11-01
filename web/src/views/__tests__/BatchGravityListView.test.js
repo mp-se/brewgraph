@@ -312,6 +312,15 @@ describe('BatchGravityListView', () => {
     expect(wrapper.vm.infoFG).toBe(1.01)
   })
 
+  it('shows -- for a reading without gravity', async () => {
+    const wrapper = mountWrapper()
+    await nextTick()
+
+    expect(wrapper.vm.formatGravity(null)).toBe('--')
+    expect(wrapper.vm.formatGravity(undefined)).toBe('--')
+    expect(wrapper.vm.formatGravity(1.05)).toBe('1.050')
+  })
+
   it('has sortedIconClass function available', async () => {
     const wrapper = mountWrapper()
     await nextTick()
@@ -508,6 +517,25 @@ describe('BatchGravityListView', () => {
     const html = wrapper.html()
     expect(html).toContain('2023-01-01')
     expect(html).toContain('10:00:00')
+  })
+
+  it('shows -- when a gravity reading has no battery voltage or percentage', async () => {
+    mockStores.gravity.getGravityListForBatch.mockResolvedValueOnce([{
+      id: 4,
+      batchId: 1,
+      gravity: 1.04,
+      created: '2023-01-04 10:00:00',
+      excluded: false,
+      temperature: 20,
+      battery: null,
+      batteryPercent: null
+    }])
+    const wrapper = mountWrapper()
+    await nextTick()
+    await nextTick()
+    await nextTick()
+
+    expect(wrapper.find('tbody tr').findAll('td')[6].text()).toBe('--')
   })
 
   it('shows stats section expanded by default', async () => {

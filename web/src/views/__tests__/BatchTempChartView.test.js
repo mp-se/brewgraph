@@ -8,7 +8,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import BatchTempChartView from '../BatchTempChartView.vue'
 
 const chartState = vi.hoisted(() => ({
-  instance: { options: { scales: { x: {} } }, update: vi.fn() }
+  instance: { options: { scales: { x: {} } }, update: vi.fn(), destroy: vi.fn() }
 }))
 const chartCtor = vi.hoisted(() => vi.fn(function () { return chartState.instance }))
 
@@ -47,7 +47,7 @@ describe('BatchTempChartView', () => {
     config.isTempC = true
     global.disabled = false
     global.messageError = ''
-    chartState.instance = { options: { scales: { x: {} } }, update: vi.fn() }
+    chartState.instance = { options: { scales: { x: {} } }, update: vi.fn(), destroy: vi.fn() }
   })
 
   const mountView = () => mount(BatchTempChartView, {

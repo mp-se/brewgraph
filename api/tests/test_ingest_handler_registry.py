@@ -147,7 +147,23 @@ def test_endpoints_listing_still_works(app_client, monkeypatch):
             "chamber", "dispatch"} <= urls.keys()
     # Devices are told the short URL the web proxy exposes, not the canonical
     # /api/ingest/<device> route it rewrites to.
-    assert urls == {device: f"/ingest/{device}" for device in urls}
+    expected = {device: f"/ingest/{device}" for device in urls}
+    expected["kegmon"] = ""  # the firmware adds its own paths
+    assert urls == expected
+
+
+def test_endpoints_listing_gives_kegmon_the_server_only(app_client, monkeypatch):
+    """KegMon's firmware adds its own paths, so its entry is the base URL and a note."""
+    monkeypatch.setenv("PUBLIC_URL", "https://brew.example.com/")
+    test_init()
+    entries = {e["device"]: e for e in app_client.get("/ingest/endpoints", headers=headers).json()}
+    assert set(entries["kegmon"]) == set(entries["gravitymon"])
+    assert entries["kegmon"]["url"] == "https://brew.example.com"
+    assert "Server only" in entries["kegmon"]["note"]
+    assert "/ingest/kegmon/beer" in entries["kegmon"]["note"]
+    assert entries["gravitymon"]["url"] == "https://brew.example.com/ingest/gravitymon"
+    assert entries["chamber"]["url"] == "https://brew.example.com/ingest/chamber"
+    assert entries["dispatch"]["url"] == "https://brew.example.com/ingest/dispatch"
 
 
 def test_gravitymon_endpoint_still_works(app_client):
@@ -440,6 +456,7 @@ def test_kegmon_beer_endpoint_still_works(app_client):
     tap = _setup_tap_with_vessel(app_client, "reg-kegmon-beer-token")
     r = app_client.post("/ingest/kegmon/beer", json={"token": tap["token"]})
     assert r.status_code == 200
+    assert r.json()["name"] == "Registry Test Batch"
 
 
 def test_dispatch_endpoint_still_works(app_client):

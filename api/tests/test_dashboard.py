@@ -3,10 +3,22 @@
 
 """Tests for GET /api/dashboard endpoint."""
 import json
+import uuid
 
 import pytest
 
 from core.config import get_settings
+from core.db import create_session
+from oss.models.pressure_reading import PressureReading
+from oss.models.temp_reading import TempReading
+from oss.schemas.gravity_reading import GravityReadingCreate
+from oss.schemas.pressure_reading import PressureReadingCreate
+from oss.schemas.temp_reading import TempReadingCreate
+from oss.services.batch import BatchService
+from oss.services.device import DeviceService
+from oss.services.gravity import GravityService
+from oss.services.pressure import PressureService
+from oss.services.temp_reading import TempService
 from tests.conftest import truncate_database
 
 headers = {
@@ -44,11 +56,11 @@ def _create_batch(app_client, **kwargs) -> str:
     return json.loads(r.text)["id"]
 
 
-def _create_device(app_client, name="DashDev") -> dict:
+def _create_device(app_client, name="DashDev", device_type="gravitymon") -> dict:
     """Create a device and return its JSON response."""
     r = app_client.post(
         "/devices",
-        json={"name": name, "deviceType": "gravitymon", "description": "", "chipFamily": "ESP32",
+        json={"name": name, "deviceType": device_type, "description": "", "chipFamily": "ESP32",
               "collectLogs": False},
         headers=headers,
     )
@@ -160,17 +172,6 @@ def test_dashboard_batch_with_brew_date(app_client):
 
 def test_dashboard_device_with_gravity_reading(app_client):
     """Device with batch_role=gravity and a reading has latest_reading populated."""
-    import uuid  # pylint: disable=import-outside-toplevel
-
-    from core.db import \
-        create_session  # pylint: disable=import-outside-toplevel
-    from oss.schemas.gravity_reading import \
-        GravityReadingCreate  # pylint: disable=import-outside-toplevel
-    from oss.services.device import \
-        DeviceService  # pylint: disable=import-outside-toplevel
-    from oss.services.gravity import \
-        GravityService  # pylint: disable=import-outside-toplevel
-
     batch_id = _create_batch(app_client, accept_ingest=True)
     dev = _create_device(app_client, name="GravityDev")
     dev_id = uuid.UUID(dev["id"])
@@ -186,6 +187,7 @@ def test_dashboard_device_with_gravity_reading(app_client):
         device_id=dev_id,
         gravity=1.048,
         temperature=19.5,
+        battery_percent=87.12345,
     ))
 
     r = app_client.get("/dashboard", headers=headers)
@@ -195,23 +197,15 @@ def test_dashboard_device_with_gravity_reading(app_client):
     assert match is not None
     assert match["latestReading"] is not None
     assert match["latestReading"]["gravity"] == 1.048
+    assert match["latestReading"]["batteryPercent"] == 87.12345
+    batch = next(b for b in r.json()["batches"] if b["id"] == batch_id)
+    assert batch["batteryPercent"] == 87.12345
 
 
 def test_dashboard_temp_probe_only_batch_reports_current_temp(app_client):
     """A batch with only a nominated temp_device_id (no gravity/pressure device) still
     gets current_temp populated — sourced from that device, not guessed from a reading
     that doesn't exist."""
-    import uuid  # pylint: disable=import-outside-toplevel
-
-    from core.db import \
-        create_session  # pylint: disable=import-outside-toplevel
-    from oss.schemas.temp_reading import \
-        TempReadingCreate  # pylint: disable=import-outside-toplevel
-    from oss.services.batch import \
-        BatchService  # pylint: disable=import-outside-toplevel
-    from oss.services.temp_reading import \
-        TempService  # pylint: disable=import-outside-toplevel
-
     batch_id = _create_batch(app_client, name="TempProbeOnlyBatch", accept_ingest=True)
     dev = _create_device(app_client, name="TempOnlyDev")
     dev_id = uuid.UUID(dev["id"])
@@ -309,19 +303,8 @@ def test_dashboard_batch_first_reading_at_uses_earliest_measurement(app_client):
 
 def test_dashboard_device_with_pressure_reading(app_client):
     """Device with batch_role=pressure and a reading has latest_reading populated."""
-    import uuid  # pylint: disable=import-outside-toplevel
-
-    from core.db import \
-        create_session  # pylint: disable=import-outside-toplevel
-    from oss.schemas.pressure_reading import \
-        PressureReadingCreate  # pylint: disable=import-outside-toplevel
-    from oss.services.device import \
-        DeviceService  # pylint: disable=import-outside-toplevel
-    from oss.services.pressure import \
-        PressureService  # pylint: disable=import-outside-toplevel
-
     batch_id = _create_batch(app_client, accept_ingest=True)
-    dev = _create_device(app_client, name="PressureDev")
+    dev = _create_device(app_client, name="PressureDev", device_type="pressuremon")
     dev_id = uuid.UUID(dev["id"])
 
     session = create_session()
@@ -335,6 +318,7 @@ def test_dashboard_device_with_pressure_reading(app_client):
         device_id=dev_id,
         pressure=105.0,
         temperature=18.0,
+        battery_percent=72.54321,
     ))
 
     r = app_client.get("/dashboard", headers=headers)
@@ -344,6 +328,82 @@ def test_dashboard_device_with_pressure_reading(app_client):
     assert match is not None
     assert match["latestReading"] is not None
     assert match["latestReading"]["pressure"] == 105.0
+    assert match["latestReading"]["batteryPercent"] == 72.54321
+
+
+def _vessel_assigned_pressuremon(app_client, pressure):
+    """Create a pressuremon assigned to a vessel (no batch role) with one reading."""
+    batch_id = _create_batch(app_client, name="VesselBatch", status="packaged")
+    r = app_client.post(
+        "/vessels",
+        json={"batchId": batch_id, "vesselNumber": 1, "vesselType": "keg", "name": "K",
+              "fillDate": "2026-05-01", "totalVolume": 19.0, "volumeRemaining": 19.0,
+              "status": "filled"},
+        headers=headers,
+    )
+    assert r.status_code == 201
+    vessel_id = uuid.UUID(r.json()["id"])
+    dev_id = uuid.UUID(_create_device(app_client, name="VesselPM", device_type="pressuremon")["id"])
+
+    session = create_session()
+    device = DeviceService(session).get(dev_id)
+    device.vessel_id = vessel_id
+    device.batch_role = None
+    session.add(PressureReading(vessel_id=vessel_id, device_id=dev_id, pressure=pressure,
+                                temperature=4.5))
+    session.commit()
+    r = app_client.get("/dashboard", headers=headers)
+    assert r.status_code == 200
+    return next(d for d in r.json()["devices"] if d["id"] == str(dev_id))
+
+
+def test_dashboard_vessel_assigned_pressure_device_has_latest_reading(app_client):
+    """A pressuremon in a vessel (batch_role null) still shows its latest reading."""
+    match = _vessel_assigned_pressuremon(app_client, 12.5)
+    assert match["batchRole"] is None
+    assert match["latestReading"]["pressure"] == 12.5
+    assert match["latestReading"]["temperature"] == 4.5
+
+
+def test_dashboard_vessel_assigned_null_pressure_keeps_reading(app_client):
+    """A reading without a pressure value is still returned, with pressure null."""
+    match = _vessel_assigned_pressuremon(app_client, None)
+    assert match["latestReading"] is not None
+    assert match["latestReading"]["pressure"] is None
+    assert match["latestReading"]["temperature"] == 4.5
+
+
+def _chamber_controller_dashboard(app_client, role, reading):
+    """Create a chamber controller with the given role and reading; return its dashboard entry."""
+    batch_id = uuid.UUID(_create_batch(app_client, accept_ingest=True))
+    dev_id = uuid.UUID(
+        _create_device(app_client, name="Chamber", device_type="chamber_controller")["id"])
+    session = create_session()
+    device = DeviceService(session).get(dev_id)
+    device.batch_role = role
+    device.batch_id = batch_id if role else None
+    session.add(reading(batch_id if role else None, dev_id))
+    session.commit()
+    r = app_client.get("/dashboard", headers=headers)
+    assert r.status_code == 200
+    return next(d for d in r.json()["devices"] if d["id"] == str(dev_id))
+
+
+def test_dashboard_chamber_controller_without_role_reads_temperature(app_client):
+    """A chamber controller with no batch role reports its latest temperature reading."""
+    match = _chamber_controller_dashboard(
+        app_client, None,
+        lambda _batch, dev: TempReading(device_id=dev, temperature=3.5))
+    assert match["latestReading"]["temperature"] == 3.5
+
+
+def test_dashboard_chamber_controller_with_chamber_role_reads_pressure(app_client):
+    """The chamber batch role keeps reading pressure."""
+    match = _chamber_controller_dashboard(
+        app_client, "chamber",
+        lambda batch, dev: PressureReading(batch_id=batch, device_id=dev, pressure=7.0,
+                                           temperature=5.0))
+    assert match["latestReading"]["pressure"] == 7.0
 
 
 def test_dashboard_with_vessel(app_client):

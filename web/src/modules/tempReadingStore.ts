@@ -16,6 +16,7 @@ export interface TemperatureReading {
   temperature: number
   tempType: string
   battery: number | null
+  batteryPercent: number | null
   rssi: number | null
   excluded: boolean
 }

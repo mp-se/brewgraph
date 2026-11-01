@@ -30,6 +30,7 @@ export interface DashboardLatestReading {
   pressure: number | null
   temperature: number | null
   battery: number | null
+  batteryPercent: number | null
   rssi: number | null
   recordedAt: string | null
 }
@@ -61,6 +62,7 @@ export interface DashboardBatch {
   currentTemp: number | null
   tempDeviceId: string | null
   battery: number | null
+  batteryPercent: number | null
   rssi: number | null
   firstReadingAt: string | null
   lastReadingAt: string | null

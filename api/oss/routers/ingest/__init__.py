@@ -18,7 +18,7 @@ thin request/response wrapper around its use case's `_process_*` function
 import logging
 from contextlib import contextmanager
 from json import JSONDecodeError
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import BackgroundTasks, Depends, Request
 from fastapi.responses import Response
@@ -26,10 +26,11 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException
 
 from core.cache import delete_key, set_key_if_absent
-from core.enums import DeviceType
+from core.enums import DeviceType, IngestionErrorReason
 from core.middleware.auth import AuthContext, ingest_auth, retry_after_headers
 from core.models.registry import resolve_model
 from core.utils import get_client_ip
+from oss.schemas.batch import abv_from_gravity
 from oss.schemas.ingest import (
     ChamberIngestRequest,
     ChamberIngestResponse,
@@ -42,7 +43,9 @@ from oss.schemas.ingest import (
 )
 from oss.services.ingestion import IngestionService
 
-from ._shared import IngestContext, _check_device_request_quota, _get_ingestion_service, router
+from ._shared import (
+    IngestContext, _check_device_request_quota, _get_ingestion_service, router, with_url_token,
+)
 from .chamber import _process_chamber
 from .dispatch import _detect_device_type
 from .gravity import _process_gravity
@@ -116,8 +119,22 @@ async def ingest_kegmon(
     return await _process_pour(payload, ctx)
 
 
+_TOKEN_DOC = "Device token (alternative to the body `token`, which wins when both are sent)"
+_TOKEN_IN_QUERY = {"parameters": [{
+    "name": "token", "in": "query", "required": False, "description": _TOKEN_DOC,
+    "schema": {"type": "string"},
+}]}
+_TOKEN_IN_PATH = {"parameters": [{
+    "name": "token", "in": "path", "required": True, "description": _TOKEN_DOC,
+    "schema": {"type": "string"},
+}]}
+_PLAIN_OK = {200: {"content": {"text/plain": {}}, "description": "Accepted; body is empty."}}
+
+
 @router.post("/ingest/gravitymon", status_code=200, response_class=Response,
-    responses={200: {"content": {"text/plain": {}}, "description": "Accepted; body is empty."}})
+             responses=_PLAIN_OK, openapi_extra=_TOKEN_IN_QUERY)
+@router.post("/ingest/gravitymon/{token}", status_code=200, response_class=Response,
+             responses=_PLAIN_OK, openapi_extra=_TOKEN_IN_PATH)
 async def ingest_gravitymon(
     request: Request,
     body: GravityIngestRequest,
@@ -125,15 +142,18 @@ async def ingest_gravitymon(
     ingestion_svc: IngestionService = Depends(_get_ingestion_service),
     auth: AuthContext = Depends(ingest_auth),
 ) -> Response:
-    """Ingest a GravityMon payload."""
+    """Ingest a GravityMon payload. Token: body, `?token=`, or `/{token}` path segment."""
     logger.info("Endpoint POST /ingest/gravitymon")
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
-    return await _process_gravity(body.model_dump(by_alias=True), ctx, "gravitymon")
+    payload = with_url_token(body.model_dump(by_alias=True), request)
+    return await _process_gravity(payload, ctx, "gravitymon")
 
 
 @router.post("/ingest/ispindel", status_code=200, response_class=Response,
-    responses={200: {"content": {"text/plain": {}}, "description": "Accepted; body is empty."}})
+             responses=_PLAIN_OK, openapi_extra=_TOKEN_IN_QUERY)
+@router.post("/ingest/ispindel/{token}", status_code=200, response_class=Response,
+             responses=_PLAIN_OK, openapi_extra=_TOKEN_IN_PATH)
 async def ingest_ispindel(
     request: Request,
     body: IspindelIngestRequest,
@@ -141,15 +161,18 @@ async def ingest_ispindel(
     ingestion_svc: IngestionService = Depends(_get_ingestion_service),
     auth: AuthContext = Depends(ingest_auth),
 ) -> Response:
-    """Ingest an iSpindel payload."""
+    """Ingest an iSpindel payload. Token: body, `?token=`, or `/{token}` path segment."""
     logger.info("Endpoint POST /ingest/ispindel")
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
-    return await _process_gravity(body.model_dump(by_alias=True), ctx, "ispindel")
+    payload = with_url_token(body.model_dump(by_alias=True), request)
+    return await _process_gravity(payload, ctx, "ispindel")
 
 
 @router.post("/ingest/pressuremon", status_code=200, response_class=Response,
-    responses={200: {"content": {"text/plain": {}}, "description": "Accepted; body is empty."}})
+             responses=_PLAIN_OK, openapi_extra=_TOKEN_IN_QUERY)
+@router.post("/ingest/pressuremon/{token}", status_code=200, response_class=Response,
+             responses=_PLAIN_OK, openapi_extra=_TOKEN_IN_PATH)
 async def ingest_pressuremon(
     request: Request,
     body: PressureIngestRequest,
@@ -157,11 +180,12 @@ async def ingest_pressuremon(
     ingestion_svc: IngestionService = Depends(_get_ingestion_service),
     auth: AuthContext = Depends(ingest_auth),
 ) -> Response:
-    """Ingest a PressureMon payload."""
+    """Ingest a PressureMon payload. Token: body, `?token=`, or `/{token}` path segment."""
     logger.info("Endpoint POST /ingest/pressuremon")
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
-    return await _process_pressure(body.model_dump(by_alias=True), ctx)
+    payload = with_url_token(body.model_dump(by_alias=True), request)
+    return await _process_pressure(payload, ctx)
 
 
 @router.post("/ingest/chamber", status_code=200, response_model=ChamberIngestResponse)
@@ -275,9 +299,16 @@ async def ingest_dispatch(
     return await _process_chamber(payload, ctx)
 
 
+def beer_abv(batch) -> Optional[float]:
+    """ABV for KegMon: measured when both measured gravities exist, else the planned one."""
+    measured = abv_from_gravity(batch.og_measured, batch.fg_measured)
+    return measured if measured is not None else batch.abv
+
+
 @router.post("/ingest/kegmon/beer", status_code=200, response_model=KegmonBeerResponse,
              dependencies=[Depends(ingest_auth)])
 async def ingest_kegmon_beer(
+    request: Request,
     body: KegmonBeerRequest,
     ingestion_svc: IngestionService = Depends(_get_ingestion_service),
 ) -> Any:
@@ -297,6 +328,10 @@ async def ingest_kegmon_beer(
     _check_device_request_quota(body.token)
     tap = ingestion_svc.resolve_tap(body.token)
     if tap is None:
+        ingestion_svc.log_ingestion_error(
+            get_client_ip(request), "kegmon", IngestionErrorReason.UNKNOWN_TOKEN,
+            "Token not found — tap not registered",
+        )
         raise HTTPException(status_code=401, detail="Tap not registered")
 
     vessel = ingestion_svc.find_active_vessel_for_tap(tap)
@@ -309,8 +344,8 @@ async def ingest_kegmon_beer(
         raise HTTPException(status_code=401, detail="Batch not found")
 
     return {
-        "name": vessel.name or batch.name,
-        "abv": batch.abv,
+        "name": batch.name or vessel.name,
+        "abv": beer_abv(batch),
         "ebc": batch.ebc,
         "ibu": batch.ibu,
     }

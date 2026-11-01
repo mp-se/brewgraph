@@ -96,6 +96,13 @@ class BatchBase(BaseModel):
         return quantise(float(self.recipe_cost) / self.volume, "money")
 
 
+def abv_from_gravity(og: Optional[float], fg: Optional[float]) -> Optional[float]:
+    """Alcohol by volume in percent from an original and a final gravity, or None if either is missing."""
+    if og is None or fg is None:
+        return None
+    return quantise((og - fg) * 131.25, "percent")
+
+
 class BatchCreate(BatchBase):
     """Used when creating a new batch."""
 
@@ -138,6 +145,12 @@ class BatchResponse(BatchCreate):
     dry_hops: List["BatchDryHopResponse"] = Field(
         default_factory=list, validation_alias="active_dry_hops"
     )
+
+    @computed_field
+    @property
+    def abv_measured(self) -> Optional[float]:
+        """ABV computed from the measured gravities; None until both are set."""
+        return abv_from_gravity(self.og_measured, self.fg_measured)
 
     @computed_field
     @property

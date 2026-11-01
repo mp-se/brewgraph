@@ -274,6 +274,23 @@ describe('BatchPressureListView', () => {
     expect(wrapper.find('.icon-link').exists()).toBe(true)
   })
 
+  it('shows -- when a pressure reading has no battery voltage or percentage', async () => {
+    mockStores.pressure.getPressureListForBatch.mockResolvedValueOnce([{
+      id: 3,
+      pressure: 13,
+      createdAt: '2023-01-03T10:00:00Z',
+      active: true,
+      temperature: 22,
+      battery: null,
+      batteryPercent: null,
+      rssi: null,
+      runTime: null
+    }])
+    const wrapper = await mountWrapper()
+
+    expect(wrapper.find('tbody tr').findAll('td')[4].text()).toBe('--')
+  })
+
   it('sorts by date, pressure, and battery using the table header controls', async () => {
     const wrapper = await mountWrapper()
     const { sortList } = await import('@/modules/ui')

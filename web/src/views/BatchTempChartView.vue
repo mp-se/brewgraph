@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Chart, registerables } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
 import 'date-fns'
@@ -59,7 +59,8 @@ import { logDebug, logError } from '@/ui'
 
 Chart.register(...registerables, zoomPlugin)
 
-let chart = null // Do not use ref for this, will cause stack overflow...
+let chart = null // Chart instances stay outside Vue reactivity.
+onBeforeUnmount(() => chart?.destroy())
 
 const batchName = ref('')
 const tempData = ref([])

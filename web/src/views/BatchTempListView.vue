@@ -31,7 +31,7 @@
           <td>{{ reading.createdAt.substring(0, 19).replace('T', ' ') }}</td>
           <td>{{ getFormattedTemperature(reading.temperature) }}</td>
           <td>{{ reading.tempType }}</td>
-          <td>{{ reading.battery === null ? '--' : reading.battery.toFixed(2) }}</td>
+          <td>{{ formatBattery(reading.battery, reading.batteryPercent) }}</td>
           <td>{{ reading.rssi ?? '--' }}</td>
         </tr>
       </tbody>
@@ -45,6 +45,7 @@ import { onMounted, ref } from 'vue'
 import { batchStore, config, global, tempReadingStore } from '@/modules/pinia'
 import router from '@/modules/router'
 import { getFormattedTemperature } from '@/modules/utils'
+import { formatBattery } from '@/modules/batteryDisplay'
 import type { TemperatureReading } from '@/modules/tempReadingStore'
 
 const batchName = ref('')

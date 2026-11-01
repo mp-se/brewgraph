@@ -26,7 +26,7 @@ describe('Batch - Data Class', () => {
       expect(batch.brewDate).toBe('')
       expect(batch.style).toBe('')
       expect(batch.brewer).toBe('')
-      expect(batch.abv).toBe(0)
+      expect(batch.abv).toBeNull()
       expect(batch.ebc).toBeNull()
       expect(batch.ibu).toBeNull()
       expect(batch.fg).toBeNull()
@@ -129,11 +129,18 @@ describe('Batch - Data Class', () => {
       expect(batch.createdAt).toBe('2024-01-01T00:00:00')
     })
 
+    it('should read abvMeasured from the API without sending it back', () => {
+      const batch = Batch.fromJson({ id: 'x', name: 'N', abv: 5, abvMeasured: 5.5 })
+      expect(batch.abvMeasured).toBe(5.5)
+      expect(batch.toJson().abvMeasured).toBeUndefined()
+      expect(Batch.fromJson({ id: 'x', name: 'N' }).abvMeasured).toBeNull()
+    })
+
     it('should default missing optional fields', () => {
       const batch = Batch.fromJson({ id: 'x', name: 'Minimal' })
       expect(batch.gravityDeviceId).toBeNull()
       expect(batch.brewDate).toBe('')
-      expect(batch.abv).toBe(0)
+      expect(batch.abv).toBeNull()
       expect(batch.carbonationVolumes).toBeNull()
       expect(batch.notes).toBe('')
     })

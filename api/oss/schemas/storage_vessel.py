@@ -195,6 +195,9 @@ class StorageVesselResponse(StorageVesselBase):
     id: uuid.UUID
     version: int = 1
     tap_id: Optional[uuid.UUID] = None
+    # A level reported by a device is stored as received, so a stored one may be negative.
+    total_volume: float
+    volume_remaining: float
     created_at: datetime
     updated_at: datetime
     serving_temp_alert_enabled: bool = False

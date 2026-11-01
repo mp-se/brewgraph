@@ -26,7 +26,7 @@ describe('Batch', () => {
       expect(b.id).toBe('')
       expect(b.name).toBe('')
       expect(b.acceptIngest).toBe(true)
-      expect(b.abv).toBe(0)
+      expect(b.abv).toBeNull()
       expect(b.og).toBeNull()
       expect(b.fg).toBeNull()
     })
@@ -446,7 +446,7 @@ describe('Tap', () => {
 describe('Gravity', () => {
   it('creates with defaults', () => {
     const g = new Gravity()
-    expect(g.gravity).toBe(0)
+    expect(g.gravity).toBeNull()
     expect(g.excluded).toBe(false)
     expect(g.temperature).toBeNull()
   })

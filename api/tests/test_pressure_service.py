@@ -295,6 +295,15 @@ class TestSearchByBatchIdLast24h:
         results = PressureService(create_session()).search_by_batch_id_last_24h(bid)
         assert len(results) == 0
 
+    def test_uuid_batch_id_is_logged(self, caplog):
+        """A UUID batch id is formatted into the log line without raising."""
+        caplog.set_level("INFO")
+        batch_id = uuid.uuid4()
+        service = PressureService(create_session())
+        results = service.search_by_batch_id_last_24h(batch_id)
+        assert not results
+        assert f"batchId={batch_id}" in caplog.text
+
 
 class TestLatestForBatchWithCutoff:
     """Tests for PressureService.latest_for_batch with retention_cutoff."""

@@ -126,7 +126,7 @@
       min="0"
       max="100"
       step="0.01"
-      help=""
+      :help="abvHelp"
       :disabled="disabled"
     >
     </AppInputNumber>
@@ -276,6 +276,16 @@ const {
 } = useGravityConversion(batch, 'og')
 const { displayValue: fgDisplayValue, step: fgStep } = useGravityConversion(batch, 'fg')
 const volumeStep = stepFor('volume')
+
+// The planned ABV follows OG and FG (the API recalculates it when either changes), so say so
+// while the stored value is what the stored gravities give, and show the measured ABV beside it.
+const abvHelp = computed(() => {
+  const { og, fg, abv, abvMeasured } = batch.value ?? {}
+  const calculated =
+    og != null && fg != null && abv != null && Math.abs((og - fg) * 131.25 - abv) < 0.05
+  const measured = abvMeasured != null ? `${abvMeasured.toFixed(1)}%` : '\u2014'
+  return `${calculated ? 'Calculated from OG and FG. ' : ''}Measured: ${measured}`
+})
 
 // Same formula BatchView.vue applies inline.
 const readyStatus = computed(() => {

@@ -33,6 +33,7 @@ export interface BrewGraphGravityRecord {
   velocity: number | null
   angle: number | null
   battery: number | null
+  batteryPercent?: number | null
   rssi: number | null
   runTime: number | null
   excluded: boolean
@@ -46,6 +47,7 @@ export interface BrewGraphPressureRecord {
   temperature: number | null
   pressure: number
   battery: number | null
+  batteryPercent?: number | null
   rssi: number | null
   runTime: number | null
   excluded: boolean
@@ -119,6 +121,7 @@ export interface BrewGraphVesselTempReading {
   temperature: number | null
   tempType: string | null
   battery: number | null
+  batteryPercent?: number | null
   rssi: number | null
   excluded: boolean
   isAggregate: boolean
@@ -130,6 +133,7 @@ export interface BrewGraphVesselPressureReading {
   pressure: number | null
   temperature: number | null
   battery: number | null
+  batteryPercent?: number | null
   rssi: number | null
   runTime: number | null
   excluded: boolean

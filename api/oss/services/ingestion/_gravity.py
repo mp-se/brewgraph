@@ -15,12 +15,35 @@ from typing import Optional
 
 from core.log import LogLevel, system_log
 from oss.precision import quantise
-from oss.schemas.gravity_reading import GravityReadingCreate
+from oss.schemas.gravity_reading import GravityReadingIngest
 
-from ._utils import Batch, Device, GravityReading, _payload_temperature, _safe_float
+from ._utils import (
+    Batch,
+    Device,
+    GravityReading,
+    UnstorableValueError,
+    _finite,
+    _optional_float,
+    _payload_temperature,
+    _required_float,
+)
 
 
 logger = logging.getLogger(__name__)
+
+
+def _payload_gravity(payload: dict, gravity_units: str, device: Device) -> Optional[float]:
+    """The payload's gravity as SG. Only an iSpindel or GravityMon device may omit it (the
+    reading then keeps a null gravity); for every other source it cannot be stored."""
+    if payload.get("gravity") is None and device.device_type in ("ispindel", "gravitymon"):
+        return None
+    gravity = _required_float(payload, "gravity")
+    if gravity_units.upper() == "P":
+        try:
+            gravity = quantise(1 + (gravity / (258.6 - ((gravity / 258.2) * 227.1))), "gravity")
+        except ZeroDivisionError as exc:
+            raise UnstorableValueError("gravity", "no specific gravity for this Plato") from exc
+    return _finite(gravity, "gravity")
 
 
 class _GravityIngestionMixin:
@@ -34,48 +57,37 @@ class _GravityIngestionMixin:
         # so this rides in the same transaction as the reading write below.
         device.last_seen = datetime.now(UTC)
         device.failed_ingest_counter = 0
-        run_time: Optional[float] = None
-        velocity: Optional[float] = None
         gravity_units = "SG"
 
         if payload.get("gravity-unit") is not None:
             gravity_units = payload["gravity-unit"]
         elif "name" in payload and not str(payload["name"]).startswith("[SG]"):
             gravity_units = "P"
-        if payload.get("run-time") is not None:
-            run_time = _safe_float(payload["run-time"], default=0.0, lo=0.0, hi=1e6)
-        if payload.get("velocity") is not None:
-            velocity = _safe_float(payload["velocity"], default=0.0, lo=-100.0, hi=100.0)
 
         temperature = _payload_temperature(payload)
 
-        if gravity_units.upper() == "P":
-            plato = _safe_float(payload.get("gravity", 0.0), default=0.0, lo=0.0, hi=40.0)
-            gravity = quantise(1 + (plato / (258.6 - ((plato / 258.2) * 227.1))), "gravity")
-        else:
-            gravity = _safe_float(payload.get("gravity", 0.0), default=0.0, lo=0.8, hi=2.0)
+        gravity = _payload_gravity(payload, gravity_units, device)
 
         excluded = False
-        if batch.og is not None and gravity > batch.og * 1.10:
-            excluded = True
-        elif batch.fg is not None and gravity < batch.fg * 0.90:
-            excluded = True
+        if gravity is not None:
+            if batch.og is not None and gravity > batch.og * 1.10:
+                excluded = True
+            elif batch.fg is not None and gravity < batch.fg * 0.90:
+                excluded = True
 
-        reading = GravityReadingCreate(
+        # Every measurement is stored as received; an optional one that was not sent is
+        # null. Battery is volts, rssi is dBm: neither is range-checked.
+        reading = GravityReadingIngest(
             batch_id=batch.id,
             device_id=device.id,
             temperature=temperature,
             gravity=gravity,
-            velocity=velocity,
-            angle=_safe_float(payload.get("angle", 0.0), default=0.0, lo=0.0, hi=180.0),
-            # battery is volts, not a percentage — hi=10.0 is a 1S lithium voltage
-            # bound (~3.0-4.2 V nominal), with headroom for a fresh cell and a
-            # possible future 2S device. Do not tighten this to a percentage range.
-            battery=_safe_float(payload.get("battery", 0.0), default=0.0, lo=0.0, hi=10.0),
-            rssi=_safe_float(
-                payload.get("RSSI", payload.get("rssi", 0.0)), default=0.0, lo=-200.0, hi=0.0
-            ),
-            run_time=run_time,
+            velocity=_optional_float(payload, "velocity"),
+            angle=_optional_float(payload, "angle"),
+            battery=_optional_float(payload, "battery"),
+            battery_percent=_optional_float(payload, "battery_percent"),
+            rssi=_optional_float(payload, "RSSI", "rssi"),
+            run_time=_optional_float(payload, "run-time"),
             excluded=excluded,
             created_at=datetime.now(UTC),
         )
@@ -85,7 +97,6 @@ class _GravityIngestionMixin:
         self, device: Device, device_type: str, payload: dict
     ) -> tuple[Batch, GravityReading]:
         """Atomically create/attach context and persist one gravity reading."""
-        self.stamp_device_last_seen(device)
         try:
             batch = self.find_or_create_batch(device, device_type)
             reading = self.write_gravity(

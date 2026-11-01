@@ -16,8 +16,10 @@ import pytest
 from starlette.exceptions import HTTPException
 
 from core.config import get_settings
-from core.db import get_session
+from core.db import create_session, get_session
+from core.models.platform import IngestionLog
 from core.models.registry import resolve_model
+from oss.services.ingestion import IngestionService, UnstorableValueError
 from oss.routers.ingest import (
     _check_device_request_quota,
     _check_throttle,
@@ -26,6 +28,7 @@ from oss.routers.ingest import (
 )
 from tests.conftest import DEVICE_DEFAULTS, truncate_database
 
+Device = resolve_model("Device")
 Tap = resolve_model("Tap")
 
 headers = {
@@ -435,3 +438,258 @@ def test_pressuremon_parse_error_returns_422(app_client):
         headers={"Content-Type": "application/json"},
     )
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# KegMon stores the volume it reports
+# ---------------------------------------------------------------------------
+
+def _kegmon_setup(app_client, token: str = "kegmon-store-token", total: float = 20.0) -> tuple:
+    """Create a tap carrying a keg of ``total`` litres; return (tap, vessel_id)."""
+    truncate_database()
+    tap = _create_tap_with_token(app_client, token)
+    batch_id = app_client.post("/batches", json={"name": "Keg Batch"}, headers=headers).json()["id"]
+    vessel_id = app_client.post("/vessels", json={
+        "batchId": batch_id, "vesselType": "keg", "name": "Keg", "fillDate": "2026-05-01",
+        "totalVolume": total, "volumeRemaining": total, "status": "serving",
+    }, headers=headers).json()["id"]
+    app_client.patch(f"/vessels/{vessel_id}", json={"tapId": tap["id"]}, headers=headers)
+    return tap, vessel_id
+
+
+def _vessel(app_client, vessel_id) -> dict:
+    return app_client.get(f"/vessels/{vessel_id}", headers=headers).json()
+
+
+def test_kegmon_volume_above_max_volume_raises_the_capacity(app_client):
+    """A volume above the reported capacity is stored as received; the capacity follows it."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": 25.0, "maxVolume": 19.0,
+    })
+    assert r.status_code == 200
+    vessel = _vessel(app_client, vessel_id)
+    assert vessel["volumeRemaining"] == 25.0
+    assert vessel["totalVolume"] == 25.0
+
+
+def test_kegmon_volumes_have_no_upper_bound(app_client):
+    """Neither volume nor capacity is clamped to the old 30000 limit."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": 50000.0, "maxVolume": 60000.0,
+    })
+    assert r.status_code == 200
+    vessel = _vessel(app_client, vessel_id)
+    assert vessel["volumeRemaining"] == 50000.0
+    assert vessel["totalVolume"] == 60000.0
+
+
+def test_kegmon_pour_amount_is_stored_as_received(app_client):
+    """A pour is recorded with the amount reported, whatever its size."""
+    tap, vessel_id = _kegmon_setup(app_client, total=100000.0)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": 10.0, "maxVolume": 100000.0, "pour": 40000.0,
+    })
+    assert r.status_code == 200
+    pours = app_client.get(f"/vessels/{vessel_id}/pours", headers=headers).json()["items"]
+    assert pours[0]["pourAmount"] == 40000.0
+
+
+def _pours(app_client, vessel_id) -> list:
+    return app_client.get(f"/vessels/{vessel_id}/pours", headers=headers).json()["items"]
+
+
+def _unstorable_pour(field: str):
+    """Make the pour use case refuse the payload as it does for a value it cannot store."""
+    return patch.object(
+        IngestionService, "write_pour", side_effect=UnstorableValueError(field, "not storable")
+    )
+
+
+def _last_seen(model, key: dict):
+    session = create_session()
+    try:
+        return session.query(model).filter_by(**key).one().last_seen
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("field", ["volume", "maxVolume"])
+def test_kegmon_negative_level_is_stored_as_received(app_client, field):
+    """No sign check: a negative level is stored, and the vessel level equals it."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0, field: -1.0}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    vessel = _vessel(app_client, vessel_id)
+    if field == "volume":
+        assert vessel["volumeRemaining"] == -1.0
+        assert vessel["totalVolume"] == 19.0
+    else:
+        assert vessel["volumeRemaining"] == 10.0
+        assert vessel["totalVolume"] == 10.0
+
+
+def test_kegmon_pour_after_level_report_with_same_volume_is_stored(app_client):
+    """A pour carrying an event id is recorded even when the level did not move down."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    level = {"token": tap["token"], "volume": 15.0, "maxVolume": 20.0}
+    assert app_client.post("/ingest/kegmon", json=level).status_code == 200
+    assert _pours(app_client, vessel_id) == []
+    pour = {**level, "pour": 0.5, "eventId": "after-level"}
+    assert app_client.post("/ingest/kegmon", json=pour).status_code == 200
+    pours = _pours(app_client, vessel_id)
+    assert [p["pourAmount"] for p in pours] == [0.5]
+    assert _vessel(app_client, vessel_id)["volumeRemaining"] == 15.0
+
+
+def test_kegmon_retried_pour_is_one_event(app_client):
+    """The same event id sent twice is recorded once."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    pour = {"token": tap["token"], "volume": 15.0, "maxVolume": 20.0, "pour": 0.5, "eventId": "e1"}
+    assert app_client.post("/ingest/kegmon", json=pour).status_code == 200
+    assert app_client.post("/ingest/kegmon", json=pour).status_code == 200
+    assert len(_pours(app_client, vessel_id)) == 1
+
+
+def test_kegmon_pour_without_event_id_needs_a_lower_volume(app_client):
+    """Without an event id a pour is recorded only when the level moved down."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "maxVolume": 20.0, "pour": 0.5}
+    assert app_client.post("/ingest/kegmon", json={**body, "volume": 20.0}).status_code == 200
+    assert _pours(app_client, vessel_id) == []
+    assert app_client.post("/ingest/kegmon", json={**body, "volume": 21.0}).status_code == 200
+    assert _pours(app_client, vessel_id) == []
+    assert app_client.post("/ingest/kegmon", json={**body, "volume": 19.5}).status_code == 200
+    assert len(_pours(app_client, vessel_id)) == 1
+
+
+def test_kegmon_level_only_creates_no_pour(app_client):
+    """A payload without a pour only sets the level."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 12.0, "maxVolume": 20.0, "eventId": "level-1"}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert _pours(app_client, vessel_id) == []
+    assert _vessel(app_client, vessel_id)["volumeRemaining"] == 12.0
+
+
+def test_kegmon_refill_sets_the_level_and_creates_no_pour(app_client):
+    """A higher volume is the new level; it is not a pour."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    low = {"token": tap["token"], "volume": 5.0, "maxVolume": 20.0}
+    assert app_client.post("/ingest/kegmon", json=low).status_code == 200
+    assert app_client.post("/ingest/kegmon", json={**low, "volume": 20.0}).status_code == 200
+    assert _vessel(app_client, vessel_id)["volumeRemaining"] == 20.0
+    assert _pours(app_client, vessel_id) == []
+
+
+def test_kegmon_repeated_unstorable_value_is_logged_once(app_client):
+    """One parse_error row per tap and reason inside 15 minutes."""
+    tap, _ = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0}
+    with _unstorable_pour("volume"):
+        assert app_client.post("/ingest/kegmon", json=body).status_code == 422
+        assert app_client.post("/ingest/kegmon", json=body).status_code == 422
+    session = create_session()
+    try:
+        assert session.query(IngestionLog).filter(IngestionLog.reason == "parse_error").count() == 1
+    finally:
+        session.close()
+
+
+def test_kegmon_unstorable_value_names_the_field_and_stamps_last_seen(app_client):
+    """An unstorable level is a logged 422, releases the throttle, and the tap is still seen."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0}
+    with _unstorable_pour("maxVolume"), patch("oss.routers.ingest.delete_key") as release:
+        assert app_client.post("/ingest/kegmon", json=body).status_code == 422
+    release.assert_called_once()
+    assert _vessel(app_client, vessel_id)["volumeRemaining"] == 20.0
+    session = create_session()
+    try:
+        rows = session.query(IngestionLog).filter(IngestionLog.reason == "parse_error").all()
+        assert [row.error_detail.split(":")[0] for row in rows] == ["maxVolume"]
+    finally:
+        session.close()
+    assert _last_seen(Tap, {"id": _uuid.UUID(tap["id"])}) is not None
+
+
+def test_kegmon_throttled_request_stamps_last_seen(app_client):
+    """A 429 still records that the tap is alive."""
+    tap, _ = _kegmon_setup(app_client)
+    refusal = HTTPException(status_code=429, detail="throttled")
+    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0}
+    with patch("oss.routers.ingest._check_throttle", side_effect=refusal):
+        assert app_client.post("/ingest/kegmon", json=body).status_code == 429
+    assert _last_seen(Tap, {"id": _uuid.UUID(tap["id"])}) is not None
+
+
+def test_kegmon_unknown_token_stamps_nothing(app_client):
+    """A request that identifies no tap leaves every tap unseen."""
+    tap, _ = _kegmon_setup(app_client)
+    body = {"token": "not-a-token", "volume": 10.0, "maxVolume": 19.0}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 401
+    assert _last_seen(Tap, {"id": _uuid.UUID(tap["id"])}) is None
+
+
+def test_gravity_throttled_request_stamps_last_seen(app_client):
+    """A throttled gravity reading still records that the device is alive."""
+    truncate_database()
+    _create_device(app_client, "THR01")
+    refusal = HTTPException(status_code=429, detail="throttled")
+    with patch("oss.routers.ingest._check_throttle", side_effect=refusal):
+        r = app_client.post("/ingest/gravitymon", json={**GRAVITY_PAYLOAD, "id": "THR01"})
+    assert r.status_code == 429
+    assert _last_seen(Device, {"chip_id": "THR01"}) is not None
+
+
+def test_pressure_unstorable_value_stamps_last_seen(app_client):
+    """An unstorable pressure is a 422 and the device is still seen."""
+    truncate_database()
+    device = _create_device(app_client, "UNS01", "pressuremon")
+    payload = {**PRESSURE_PAYLOAD, "token": device["token"], "pressure": 1e307,
+               "pressure_units": "bar"}
+    assert app_client.post("/ingest/pressuremon", json=payload).status_code == 422
+    assert _last_seen(Device, {"chip_id": "UNS01"}) is not None
+
+
+def test_pressure_throttled_request_stamps_last_seen(app_client):
+    """A throttled pressure reading still records that the device is alive."""
+    truncate_database()
+    device = _create_device(app_client, "THP01", "pressuremon")
+    refusal = HTTPException(status_code=429, detail="throttled")
+    with patch("oss.routers.ingest._check_throttle", side_effect=refusal):
+        r = app_client.post(
+            "/ingest/pressuremon", json={**PRESSURE_PAYLOAD, "token": device["token"]}
+        )
+    assert r.status_code == 429
+    assert _last_seen(Device, {"chip_id": "THP01"}) is not None
+
+
+def test_unknown_gravity_device_stamps_nothing(app_client):
+    """An unregistered device is a 401 and no registered device is touched."""
+    truncate_database()
+    _create_device(app_client, "KNOWN01")
+    payload = {**GRAVITY_PAYLOAD, "id": "OTHER01"}
+    assert app_client.post("/ingest/gravitymon", json=payload).status_code == 401
+    assert _last_seen(Device, {"chip_id": "KNOWN01"}) is None
+
+
+@pytest.mark.parametrize("field", ["volume", "maxVolume", "pour"])
+@pytest.mark.parametrize("bad", ["abc", "nan", "inf", None])
+def test_kegmon_non_finite_number_rejected(app_client, field, bad):
+    """Text, NaN, infinity and a missing required level cannot be stored."""
+    tap, _ = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0, "pour": 0.3, field: bad}
+    r = app_client.post("/ingest/kegmon", json=body)
+    if field == "pour" and bad is None:
+        assert r.status_code == 200
+    else:
+        assert r.status_code == 422
+
+
+def test_kegmon_event_id_longer_than_128_is_rejected(app_client):
+    """The idempotency key keeps its length limit."""
+    tap, _ = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0, "eventId": "x" * 129}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 422

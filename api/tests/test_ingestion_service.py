@@ -28,12 +28,10 @@ def test_safe_float_inf_returns_default():
     assert _safe_float(float("inf")) == 0.0
 
 
-def test_safe_float_clamps_high():
-    assert _safe_float(200.0, lo=0.0, hi=100.0) == 100.0
-
-
-def test_safe_float_clamps_low():
-    assert _safe_float(-5.0, lo=0.0, hi=100.0) == 0.0
+def test_safe_float_keeps_the_value_as_received():
+    assert _safe_float(200000.0) == 200000.0
+    assert _safe_float(-5.0) == -5.0
+    assert _safe_float("18.5") == 18.5
 
 
 # ---------------------------------------------------------------------------
@@ -97,8 +95,8 @@ def test_write_gravity_plato_converts_to_sg():
     assert captured["grav"] == pytest.approx(1.048, abs=0.002)
 
 
-def test_write_gravity_sentinel_temperature_stored_as_none():
-    """Temperature below valid range (-270) is stored as None."""
+def test_write_gravity_temperature_below_absolute_zero_stored_as_received():
+    """A temperature is stored as received, whatever its size."""
     svc = _make_ingestion_svc()
     svc._gravity_svc = MagicMock()
     captured = {}
@@ -107,7 +105,7 @@ def test_write_gravity_sentinel_temperature_stored_as_none():
     )
 
     svc.write_gravity(_mock_batch(), _mock_device(), {"gravity": 1.050, "temperature": -300.0})
-    assert captured["temp"] is None
+    assert captured["temp"] == -300.0
 
 
 # ---------------------------------------------------------------------------

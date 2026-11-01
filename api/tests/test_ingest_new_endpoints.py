@@ -7,6 +7,8 @@
 from unittest.mock import patch
 
 from core.config import get_settings
+from core.enums import IngestionErrorReason
+from oss.services.ingestion import IngestionService
 from tests.conftest import app_client, truncate_database  # noqa: F401  # pylint: disable=unused-import
 
 
@@ -74,6 +76,19 @@ def test_kegmon_beer_unknown_token_401(app_client):
     assert r.status_code == 401
 
 
+def test_kegmon_beer_unknown_token_is_logged(app_client):
+    """An unknown tap token is recorded as UNKNOWN_TOKEN, without the token itself."""
+    truncate_database()
+    with patch.object(IngestionService, "log_ingestion_error") as log:
+        r = app_client.post("/ingest/kegmon/beer", json={"token": "unknowntap"}, headers=HDR)
+    assert r.status_code == 401
+    log.assert_called_once()
+    args = log.call_args.args
+    assert args[1] == "kegmon"
+    assert args[2] == IngestionErrorReason.UNKNOWN_TOKEN
+    assert "unknowntap" not in args[3]
+
+
 def test_kegmon_beer_missing_token_401(app_client):
     """kegmon/beer without token field returns 422 (schema validation) or 401."""
     truncate_database()
@@ -113,3 +128,22 @@ def test_throttle_returns_retry_after_header(app_client):
     r2 = app_client.post("/ingest/gravitymon", json=payload, headers=HDR)
     if r2.status_code == 429:
         assert "retry-after" in r2.headers
+
+
+def test_kegmon_beer_abv_prefers_the_measured_value(app_client):
+    """kegmon/beer sends the measured ABV when both measured gravities exist, else the planned one."""
+    from tests.test_ingest_handler_registry import (  # pylint: disable=import-outside-toplevel
+        _setup_tap_with_vessel, headers as reg_headers,
+    )
+    truncate_database()
+    tap = _setup_tap_with_vessel(app_client, "abv-beer-token")
+    vessel = app_client.get(f"/vessels/{tap['vessel_id']}", headers=reg_headers).json()
+    batch_id = vessel["batchId"]
+    app_client.patch(f"/batches/{batch_id}", json={"abv": 5.0}, headers=reg_headers)
+    r = app_client.post("/ingest/kegmon/beer", json={"token": "abv-beer-token"}, headers=HDR)
+    assert r.json()["abv"] == 5.0
+    app_client.patch(
+        f"/batches/{batch_id}", json={"ogMeasured": 1.052, "fgMeasured": 1.010}, headers=reg_headers
+    )
+    r = app_client.post("/ingest/kegmon/beer", json={"token": "abv-beer-token"}, headers=HDR)
+    assert r.json()["abv"] == 5.5

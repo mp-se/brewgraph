@@ -210,7 +210,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Chart, registerables } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
 import 'date-fns'
@@ -232,7 +232,8 @@ import {
 } from '@/modules/gravityChartData'
 import { configureGravityChart } from '@/modules/gravityChartConfig'
 
-let chart = null // Do not use ref for this, will cause stack overflow...
+let chart = null // Chart instances stay outside Vue reactivity.
+onBeforeUnmount(() => chart?.destroy())
 
 Chart.register(...registerables, zoomPlugin)
 

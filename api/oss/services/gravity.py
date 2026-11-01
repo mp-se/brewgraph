@@ -53,6 +53,18 @@ class GravityService(BaseService[GravityReading, GravityReadingCreate, GravityRe
 
     def update_for_batch(self, batch_id, reading_id, obj: GravityReadingUpdate):
         """Update a reading only when it belongs to the requested batch."""
+        if "gravity" in obj.model_fields_set and obj.gravity is None:
+            current = self.db_session.scalars(
+                select(self.model).where(
+                    self.model.id == reading_id,
+                    self.model.batch_id == batch_id,
+                    self.model.deleted_at.is_(None),
+                )
+            ).first()
+            if current is not None and current.gravity is not None:
+                raise HTTPException(
+                    status_code=422, detail="Gravity cannot be cleared on a reading that has one."
+                )
         return self.update_for_owner(reading_id, "batch_id", batch_id, obj)
 
     def search_by_batch_id(
@@ -74,7 +86,7 @@ class GravityService(BaseService[GravityReading, GravityReadingCreate, GravityRe
         query = query.order_by(self.model.created_at.asc())
         objs: List[GravityReading] = self.db_session.scalars(query).all()
         logger.info(
-            "Fetched gravity for batchId=%d, records found %d", batch_id, len(objs)
+            "Fetched gravity for batchId=%s, records found %d", batch_id, len(objs)
         )
         return objs
 
@@ -161,7 +173,7 @@ class GravityService(BaseService[GravityReading, GravityReadingCreate, GravityRe
             .order_by(self.model.created_at.asc())
         ).all()
         logger.info(
-            "Fetched last 24h gravity for batchId=%d, records found %d", batch_id, len(objs)
+            "Fetched last 24h gravity for batchId=%s, records found %d", batch_id, len(objs)
         )
         return objs
 
@@ -232,7 +244,8 @@ class GravityService(BaseService[GravityReading, GravityReadingCreate, GravityRe
         if retention_cutoff is not None:
             query = query.where(self.model.created_at >= retention_cutoff)
         return self.db_session.scalars(
-            query.order_by(self.model.gravity.desc()).limit(1)
+            query.where(self.model.gravity.isnot(None))
+            .order_by(self.model.gravity.desc()).limit(1)
         ).first()
 
     def lowest_for_batch(
@@ -248,7 +261,8 @@ class GravityService(BaseService[GravityReading, GravityReadingCreate, GravityRe
         if retention_cutoff is not None:
             query = query.where(self.model.created_at >= retention_cutoff)
         return self.db_session.scalars(
-            query.order_by(self.model.gravity.asc()).limit(1)
+            query.where(self.model.gravity.isnot(None))
+            .order_by(self.model.gravity.asc()).limit(1)
         ).first()
 
     def recent_for_device_with_battery(
@@ -301,6 +315,7 @@ class GravityService(BaseService[GravityReading, GravityReadingCreate, GravityRe
         query = select(self.model).where(
             self.model.batch_id == batch_id,
             ~self.model.excluded,
+            self.model.gravity.isnot(None),
         )
         if from_dt is not None:
             query = query.where(self.model.created_at >= from_dt)

@@ -63,6 +63,7 @@ def fixture_document() -> dict:
             "gravityReadings": [{
                 "deviceChipId": "abc123", "gravity": 1.020, "temperature": 12.0,
                 "angle": 45.0, "velocity": None, "battery": 4.1, "rssi": -60,
+                "batteryPercent": None,
                 "runTime": 3.2, "excluded": False, "isAggregate": False,
                 "createdAt": "2026-08-02T00:00:00Z",
             }],
@@ -76,6 +77,15 @@ def fixture_document() -> dict:
 
 def test_baseline_document_is_valid(validator, document):
     """Without this the rejection cases below could pass for the wrong reason."""
+    assert validator.is_valid(document), list(validator.iter_errors(document))
+
+
+def test_battery_percent_is_optional_and_preserved(validator, document):
+    """The nullable field is accepted while older documents may omit it."""
+    reading = document["batches"][0]["gravityReadings"][0]
+    reading["batteryPercent"] = 137.12345
+    assert validator.is_valid(document), list(validator.iter_errors(document))
+    del reading["batteryPercent"]
     assert validator.is_valid(document), list(validator.iter_errors(document))
 
 
@@ -145,6 +155,8 @@ def test_lossless_rule_covers_every_reading_column(validator, document):
     """
     reading = document["batches"][0]["gravityReadings"][0]
     for column in list(reading):
+        if column == "batteryPercent":
+            continue
         broken = copy.deepcopy(document)
         del broken["batches"][0]["gravityReadings"][0][column]
         assert not validator.is_valid(broken), f"dropping {column} was accepted"

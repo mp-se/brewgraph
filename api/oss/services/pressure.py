@@ -70,7 +70,7 @@ class PressureService(
         query = query.order_by(self.model.created_at.asc())
         objs: List[PressureReading] = self.db_session.scalars(query).all()
         logger.info(
-            "Fetched pressure for batchId=%d, records found %d", batch_id, len(objs)
+            "Fetched pressure for batchId=%s, records found %d", batch_id, len(objs)
         )
         return objs
 
@@ -125,7 +125,7 @@ class PressureService(
             .order_by(self.model.created_at.asc())
         ).all()
         logger.info(
-            "Fetched last 24h pressure for batchId=%d, records found %d", batch_id, len(objs)
+            "Fetched last 24h pressure for batchId=%s, records found %d", batch_id, len(objs)
         )
         return objs
 
@@ -180,7 +180,8 @@ class PressureService(
         if retention_cutoff is not None:
             query = query.where(self.model.created_at >= retention_cutoff)
         return self.db_session.scalars(
-            query.order_by(self.model.pressure.desc()).limit(1)
+            query.where(self.model.pressure.isnot(None))
+            .order_by(self.model.pressure.desc()).limit(1)
         ).first()
 
     def lowest_for_batch(
@@ -196,7 +197,8 @@ class PressureService(
         if retention_cutoff is not None:
             query = query.where(self.model.created_at >= retention_cutoff)
         return self.db_session.scalars(
-            query.order_by(self.model.pressure.asc()).limit(1)
+            query.where(self.model.pressure.isnot(None))
+            .order_by(self.model.pressure.asc()).limit(1)
         ).first()
 
     def chart_data(
@@ -211,6 +213,7 @@ class PressureService(
         query = select(self.model).where(
             self.model.batch_id == batch_id,
             ~self.model.excluded,
+            self.model.pressure.isnot(None),
         )
         if from_dt is not None:
             query = query.where(self.model.created_at >= from_dt)
@@ -311,6 +314,7 @@ class PressureService(
         query = select(self.model).where(
             self.model.vessel_id == vessel_id,
             ~self.model.excluded,
+            self.model.pressure.isnot(None),
         )
         if from_dt is not None:
             query = query.where(self.model.created_at >= from_dt)

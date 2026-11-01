@@ -27,6 +27,7 @@ export interface ExportReading {
   deviceChipId: string | null
   temperature: number | null
   battery: number | null
+  batteryPercent?: number | null
   rssi: number | null
   runTime: number | null
   excluded: boolean
@@ -55,6 +56,7 @@ export interface ExportTemperatureReading {
   temperature: number | null
   tempType: string | null
   battery: number | null
+  batteryPercent?: number | null
   rssi: number | null
   excluded: boolean
   isAggregate: boolean
@@ -174,6 +176,7 @@ export interface SourceGravityReading {
   angle?: number | null
   velocity?: number | null
   battery?: number | null
+  batteryPercent?: number | null
   rssi?: number | null
   runTime?: number | null
   excluded?: boolean
@@ -194,6 +197,7 @@ export interface SourceTemperatureReading {
   temperature?: number | null
   tempType?: string | null
   battery?: number | null
+  batteryPercent?: number | null
   rssi?: number | null
   excluded?: boolean
   isAggregate?: boolean
@@ -298,6 +302,7 @@ function gravityReading(r: SourceGravityReading, chipIdByDeviceId: Map<string, s
     angle: r.angle ?? null,
     velocity: r.velocity ?? null,
     battery: r.battery ?? null,
+    batteryPercent: r.batteryPercent ?? null,
     rssi: r.rssi ?? null,
     runTime: r.runTime ?? null,
     excluded: r.excluded ?? false,
@@ -315,6 +320,7 @@ function pressureReading(
     pressure: r.pressure ?? null,
     temperature: r.temperature ?? null,
     battery: r.battery ?? null,
+    batteryPercent: r.batteryPercent ?? null,
     rssi: r.rssi ?? null,
     runTime: r.runTime ?? null,
     excluded: r.excluded ?? false,
@@ -332,6 +338,7 @@ function temperatureReading(
     temperature: r.temperature ?? null,
     tempType: r.tempType ?? null,
     battery: r.battery ?? null,
+    batteryPercent: r.batteryPercent ?? null,
     rssi: r.rssi ?? null,
     excluded: r.excluded ?? false,
     isAggregate: r.isAggregate ?? false,

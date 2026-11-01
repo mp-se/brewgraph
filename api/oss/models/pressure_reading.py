@@ -46,8 +46,11 @@ class PressureReading(Base):
     )
     device_id = mapped_column(Uuid(as_uuid=True), ForeignKey("device.id"), nullable=True)
     temperature = mapped_column(Float, nullable=True)
-    pressure = mapped_column(Float, nullable=False)
+    pressure = mapped_column(Float, nullable=True)
+    # Second sensor of a PressureMon, kPa; stored as received, not exposed by the API.
+    pressure2 = mapped_column(Float, nullable=True)
     battery = mapped_column(Float, nullable=True)
+    battery_percent = mapped_column(Float, nullable=True)
     rssi = mapped_column(Float, nullable=True)
     run_time = mapped_column(Float, nullable=True)
     excluded = mapped_column(Boolean, nullable=False, default=False)

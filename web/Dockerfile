@@ -1,4 +1,5 @@
-FROM node:22-alpine AS build
+# Static assets are built natively and shared by both target architectures.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 # NOTE: this image builds from the REPOSITORY ROOT as context, not from web/.
 #

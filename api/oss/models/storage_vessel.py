@@ -29,10 +29,6 @@ class StorageVessel(Base):
     __tablename__ = "storage_vessel"
     __table_args__ = (
         Index("ix_storage_vessel_tenant_id", "tenant_id"),
-        CheckConstraint("total_volume >= 0", name="ck_storage_vessel_total_volume_non_negative"),
-        CheckConstraint(
-            "volume_remaining >= 0", name="ck_storage_vessel_volume_remaining_non_negative"
-        ),
         CheckConstraint(
             "volume_remaining <= total_volume", name="ck_storage_vessel_volume_remaining_le_total"
         ),

@@ -32,13 +32,13 @@ class GravityReadingBase(BaseModel):
     angle: Optional[float] = Field(default=None)
     velocity: Optional[float] = Field(default=None)
     battery: Optional[float] = Field(default=None)
+    battery_percent: Optional[float] = Field(default=None, allow_inf_nan=False)
     rssi: Optional[float] = Field(default=None)
     run_time: Optional[float] = Field(default=None)
     excluded: bool = Field(default=False)
 
     _quantise_temperature = quantised("temperature", quantity="temperature")
     _quantise_gravity = quantised("gravity", quantity="gravity")
-    _quantise_battery = quantised("battery", quantity="battery")
     _quantise_rssi = quantised("rssi", quantity="signal")
 
 
@@ -50,14 +50,23 @@ class GravityReadingCreate(GravityReadingBase):
     created_at: Optional[datetime] = None
 
 
+class GravityReadingIngest(GravityReadingCreate):
+    """A device reading; an iSpindel payload may omit the gravity, which is stored as null."""
+
+    gravity: Optional[float] = Field(default=None)
+
+
 class GravityReadingUpdate(GravityReadingBase):
-    """Used when updating a gravity reading."""
+    """Used when updating a gravity reading; omitting the gravity leaves it unchanged."""
+
+    gravity: Optional[float] = Field(default=None)
 
 
 class GravityReadingResponse(GravityReadingCreate):
-    """Full gravity reading response."""
+    """Full gravity reading response; the gravity is null when the device omitted it."""
 
     id: int
+    gravity: Optional[float] = Field(default=None)
 
 
 class GravityChartPoint(BaseModel):

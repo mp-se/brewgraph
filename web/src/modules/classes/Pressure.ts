@@ -12,8 +12,9 @@
 interface PressureParams {
   id?: number
   temperature?: number | null
-  pressure?: number
+  pressure?: number | null
   battery?: number | null
+  batteryPercent?: number | null
   rssi?: number | null
   runTime?: number | null
   excluded?: boolean
@@ -25,8 +26,9 @@ interface PressureParams {
 export class Pressure {
   private _id: number
   private _temperature: number | null
-  private _pressure: number
+  private _pressure: number | null
   private _battery: number | null
+  private _batteryPercent: number | null
   private _rssi: number | null
   private _runTime: number | null
   private _excluded: boolean
@@ -37,8 +39,9 @@ export class Pressure {
   constructor({
     id = 0,
     temperature = null,
-    pressure = 0.0,
+    pressure = null,
     battery = null,
+    batteryPercent = null,
     rssi = null,
     runTime = null,
     excluded = false,
@@ -48,8 +51,9 @@ export class Pressure {
   }: PressureParams = {}) {
     this._id = id
     this._temperature = temperature ?? null
-    this._pressure = pressure ?? 0.0
+    this._pressure = pressure ?? null
     this._battery = battery ?? null
+    this._batteryPercent = batteryPercent ?? null
     this._rssi = rssi ?? null
     this._runTime = runTime ?? null
     this._excluded = excluded ?? false
@@ -62,8 +66,9 @@ export class Pressure {
     return new Pressure({
       id: p.id as number,
       temperature: (p.temperature as number | null) ?? null,
-      pressure: p.pressure as number,
+      pressure: (p.pressure as number | null) ?? null,
       battery: (p.battery as number | null) ?? null,
+      batteryPercent: (p.batteryPercent as number | null) ?? null,
       rssi: (p.rssi as number | null) ?? null,
       runTime: (p.runTime as number | null) ?? null,
       excluded: (p.excluded as boolean) ?? false,
@@ -76,8 +81,10 @@ export class Pressure {
   toJson(): Record<string, unknown> {
     return {
       temperature: this.temperature,
-      pressure: this.pressure,
+      // An update never clears a pressure, so a reading without one leaves it out.
+      ...(this.pressure === null ? {} : { pressure: this.pressure }),
       battery: this.battery,
+      batteryPercent: this.batteryPercent,
       rssi: this.rssi,
       runTime: this.runTime,
       excluded: this.excluded
@@ -95,6 +102,9 @@ export class Pressure {
   }
   get battery() {
     return this._battery
+  }
+  get batteryPercent() {
+    return this._batteryPercent
   }
   get rssi() {
     return this._rssi
@@ -121,11 +131,14 @@ export class Pressure {
   set temperature(v: number | null) {
     this._temperature = v
   }
-  set pressure(v: number) {
+  set pressure(v: number | null) {
     this._pressure = v
   }
   set battery(v: number | null) {
     this._battery = v
+  }
+  set batteryPercent(v: number | null) {
+    this._batteryPercent = v
   }
   set rssi(v: number | null) {
     this._rssi = v

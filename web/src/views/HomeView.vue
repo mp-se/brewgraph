@@ -125,6 +125,7 @@
             <th>Gravity</th>
             <th>Velocity</th>
             <th>Temp</th>
+            <th>Battery</th>
           </template>
           <template #row="{ reading }">
             <td>{{ Number(reading.gravity).toFixed(4) }}</td>
@@ -132,6 +133,7 @@
               {{ reading.velocity !== null ? Number(reading.velocity).toFixed(4) : '--' }}
             </td>
             <td>{{ getFormattedTemperature(reading.temperature) }}</td>
+            <td>{{ formatBattery(reading.battery, reading.batteryPercent) }}</td>
           </template>
         </LatestReadingsFragment>
 
@@ -144,7 +146,7 @@
           <template #row="{ reading }">
             <td>{{ getFormattedPressure(reading.pressure) }}</td>
             <td>{{ getFormattedTemperature(reading.temperature) }}</td>
-            <td>{{ Number(reading.battery).toFixed(2) }}V</td>
+            <td>{{ formatBattery(reading.battery, reading.batteryPercent) }}</td>
           </template>
         </LatestReadingsFragment>
 
@@ -188,6 +190,7 @@ import {
   getFormattedVolume,
   getFormattedPourVolume
 } from '@/modules/utils'
+import { formatBattery } from '@/modules/batteryDisplay'
 import { logDebug, logError } from '@/ui'
 import DeviceColorSwatch from '@/components/DeviceColorSwatch.vue'
 import HomeSystemStatusCards from '@/components/HomeSystemStatusCards.vue'
@@ -240,7 +243,8 @@ const latestGravityReadings = computed(() =>
       gravity: b.currentGravity,
       temperature: b.currentTemp,
       velocity: null,
-      battery: b.battery
+      battery: b.battery,
+      batteryPercent: b.batteryPercent
     }))
     .slice(0, 5)
 )
@@ -252,7 +256,8 @@ const latestPressureReadings = computed(() =>
       createdAt: b.lastReadingAt,
       pressure: b.currentPressure,
       temperature: b.currentTemp,
-      battery: b.battery
+      battery: b.battery,
+      batteryPercent: b.batteryPercent
     }))
     .slice(0, 5)
 )

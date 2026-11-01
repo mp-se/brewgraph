@@ -8,11 +8,20 @@ import { MovingAverageFilter, type NumericPoint } from '../calculations/movingAv
 
 export interface GravitySeriesReading {
   created: string | Date
-  gravity: number
-  battery?: number
+  gravity: number | null
+  battery?: number | null
   temperature?: number | null
   chamberTemperature?: number | null
   velocity?: number | null
+}
+
+/** Readings that carry a gravity; a device that omitted it leaves a gap, not a zero. */
+function withGravity(
+  readings: GravitySeriesReading[]
+): (GravitySeriesReading & { gravity: number })[] {
+  return readings.filter(
+    (reading): reading is GravitySeriesReading & { gravity: number } => reading.gravity !== null
+  )
 }
 
 export function gravityPoints(
@@ -20,7 +29,7 @@ export function gravityPoints(
   useSpecificGravity: boolean,
   toPlato: (specificGravity: number) => number = gravityToPlato
 ): NumericPoint<string | Date>[] {
-  return readings.map((reading) => ({
+  return withGravity(readings).map((reading) => ({
     x: reading.created,
     y: Number((useSpecificGravity ? reading.gravity : toPlato(reading.gravity)).toFixed(4))
   }))
@@ -43,8 +52,9 @@ export function alcoholPoints(
   readings: GravitySeriesReading[],
   calculateAbv: (originalGravity: number, finalGravity: number) => number = abv
 ): NumericPoint<string | Date>[] {
-  const originalGravity = Math.max(...readings.map((reading) => reading.gravity))
-  return readings.map((reading) => ({
+  const measured = withGravity(readings)
+  const originalGravity = Math.max(...measured.map((reading) => reading.gravity))
+  return measured.map((reading) => ({
     x: reading.created,
     y: Number(calculateAbv(originalGravity, reading.gravity).toFixed(2))
   }))
@@ -59,7 +69,7 @@ export function gravityVelocityPoints(readings: GravitySeriesReading[]): {
   const slots: { time: number | null; totalGravity: number; count: number }[] = []
   let currentSlot = { time: null as number | null, totalGravity: 0, count: 0 }
 
-  for (const reading of readings) {
+  for (const reading of withGravity(readings)) {
     const createdTime = new Date(reading.created).getTime()
     const gravity = filter.process(reading.gravity)
     if (!currentSlot.time) currentSlot.time = createdTime

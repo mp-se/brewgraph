@@ -248,3 +248,14 @@ def test_create_single_pressure_reading_preserves_created_at(app_client):
     r = app_client.post(f"/batches/{batch_id}/pressure", json=data, headers=headers)
     assert r.status_code == 201
     assert r.json()["createdAt"].startswith("2024-06-01T12:00:00")
+
+
+def test_create_single_negative_pressure_reading(app_client):
+    """The manual endpoint accepts a negative pressure and keeps the sign."""
+    test_init()
+    batch_id = _create_batch(app_client)
+    data = {**PRESSURE_READING, "pressure": -12.5}
+
+    r = app_client.post(f"/batches/{batch_id}/pressure", json=data, headers=headers)
+    assert r.status_code == 201
+    assert r.json()["pressure"] == -12.5

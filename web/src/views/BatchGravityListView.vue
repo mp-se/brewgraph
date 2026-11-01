@@ -148,17 +148,13 @@
               />
             </td>
             <td class="text-body1">
-              {{
-                config.isGravitySG
-                  ? new Number(g.gravity).toFixed(3)
-                  : new Number(gravityToPlato(g.gravity)).toFixed(2)
-              }}
+              {{ formatGravity(g.gravity) }}
             </td>
-            <td class="text-body1">{{ new Number(g.angle).toFixed(2) }}</td>
-            <td class="text-body1">{{ new Number(g.velocity).toFixed(3) }}</td>
+            <td class="text-body1">{{ g.angle !== null ? new Number(g.angle).toFixed(2) : '--' }}</td>
+            <td class="text-body1">{{ g.velocity !== null ? new Number(g.velocity).toFixed(3) : '--' }}</td>
             <td class="text-body1">{{ getFormattedTemperature(g.temperature) }}</td>
-            <td class="text-body1">{{ new Number(g.battery).toFixed(2) }}</td>
-            <td class="text-body1">{{ g.rssi }}</td>
+            <td class="text-body1">{{ formatBattery(g.battery, g.batteryPercent) || '--' }}</td>
+            <td class="text-body1">{{ g.rssi !== null ? g.rssi : '--' }}</td>
             <td class="text-body1">{{ g.runTime !== null ? new Number(g.runTime).toFixed(2) : '--' }}</td>
           </tr>
         </tbody>
@@ -230,8 +226,15 @@ import { onMounted, ref } from 'vue'
 import { config, gravityStore, batchStore, global } from '@/modules/pinia'
 import router from '@/modules/router'
 import { gravityToPlato, platoToGravity, getGravityDataAnalytics, getFormattedTemperature } from '@/modules/utils'
+import { formatBattery } from '@/modules/batteryDisplay'
 import { stepFor } from '@/modules/useUnitConversion'
 import { logDebug, logError } from '@/ui'
+
+// A reading whose device omitted the gravity shows "--", never a zero.
+const formatGravity = (gravity) => {
+  if (gravity === null || gravity === undefined) return '--'
+  return config.isGravitySG ? Number(gravity).toFixed(3) : Number(gravityToPlato(gravity)).toFixed(2)
+}
 import { formatLocalTimestamp, localDateEnd, localDateStart } from '@/core'
 import { usePagination } from '@/modules/usePagination'
 import {

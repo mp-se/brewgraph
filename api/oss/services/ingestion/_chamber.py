@@ -59,6 +59,7 @@ class _ChamberIngestionMixin:
         temp_type: str = TempType.BEER.value,
         device_id: Optional[str] = None,
         battery: Optional[float] = None,
+        battery_percent: Optional[float] = None,
     ) -> Optional[Device]:
         """Write TempReading row(s) resolved via device token or chamber chip ID.
 
@@ -96,7 +97,7 @@ class _ChamberIngestionMixin:
         device.failed_ingest_counter = 0
         self._create_temp_rows(
             device, batch_id, ((temperature, temp_type), (fridge_temp, TempType.CHAMBER.value)),
-            (rssi, battery),
+            (rssi, battery, battery_percent),
         )
         self._commit_or_raise()
         return device
@@ -110,18 +111,19 @@ class _ChamberIngestionMixin:
         this call: both readings come from one physical device on one poll, so there is
         only ever one battery/signal value to report, not one per temp_type.
         """
-        from oss.schemas.temp_reading import TempReadingCreate  # pylint: disable=import-outside-toplevel
-        rssi, battery = telemetry
+        from oss.schemas.temp_reading import TempReadingIngest  # pylint: disable=import-outside-toplevel
+        rssi, battery, battery_percent = telemetry
         now = datetime.now(UTC)
         for value, kind in values:
             if value is None:
                 continue
-            self._temp_svc.create(TempReadingCreate(
+            self._temp_svc.create(TempReadingIngest(
                 vessel_id=device.vessel_id,
                 batch_id=batch_id,
                 device_id=device.id,
                 temperature=value,
                 battery=battery,
+                battery_percent=battery_percent,
                 rssi=rssi,
                 temp_type=kind,
                 is_aggregate=False,

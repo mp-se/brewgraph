@@ -24,20 +24,25 @@ module still gets to use it without importing it.
 import hashlib
 import os
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, NoReturn, Optional
 
 from fastapi import BackgroundTasks, Depends, Request
 from fastapi.routing import APIRouter
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException
 
+from core.cache import set_key_if_absent
 from core.db import get_session
+from core.enums import IngestionErrorReason
 from core.middleware.auth import AuthContext, enforce_request_rate_ceiling
 from core.models.registry import resolve_model
 from oss.schemas.platform import IngestEndpointResponse
 from oss.services import TenantSettingsService, get_settings_service
-from oss.services.ingestion import IngestionService
+from oss.services.ingestion import IngestionService, UnstorableValueError
 
 TenantSettings = resolve_model("TenantSettings")  # type: ignore[assignment]
+
+_PARSE_ERROR_LOG_SECONDS = 15 * 60
 
 router = APIRouter(prefix="/api", tags=["ingest"])  # auth handled per-endpoint via ingest_auth
 
@@ -48,7 +53,14 @@ _INGEST_ENDPOINTS = [
     {"device": "gravitymon", "path": "/ingest/gravitymon", "note": "token in body"},
     {"device": "ispindel", "path": "/ingest/ispindel", "note": "token in body"},
     {"device": "pressuremon", "path": "/ingest/pressuremon", "note": "token in body"},
-    {"device": "kegmon", "path": "/ingest/kegmon", "note": "token in body"},
+    # KegMon is the exception: the firmware appends /ingest/kegmon and /ingest/kegmon/beer
+    # itself, so it is given the server only.
+    {
+        "device": "kegmon",
+        "path": "",
+        "note": "Server only — the firmware adds /ingest/kegmon and /ingest/kegmon/beer; "
+                "token per tap in the body",
+    },
     {"device": "chamber", "path": "/ingest/chamber", "note": "token in body"},
     {
         "device": "dispatch",
@@ -95,6 +107,19 @@ def _check_device_request_quota(token: str | None) -> None:
     enforce_request_rate_ceiling(key)
 
 
+def with_url_token(payload: dict, request: Request) -> dict:
+    """Fill the payload's device token from the path or query when the body has none.
+
+    The body token wins when present. Everything downstream reads ``payload["token"]``,
+    so all three forms share one identity, rate ceiling and masking in ingestion logs.
+    """
+    if not payload.get("token"):
+        url_token = request.path_params.get("token") or request.query_params.get("token")
+        if url_token:
+            payload["token"] = url_token
+    return payload
+
+
 @dataclass
 class IngestContext:
     """Per-request dependencies shared by every ingest use-case's `_process_*` function.
@@ -109,3 +134,18 @@ class IngestContext:
     ingestion_svc: IngestionService
     auth: Optional[AuthContext]
     throttle_budget: Callable[..., Any]
+
+    def reject_unstorable(
+        self, device_type: str, exc: UnstorableValueError, entity, device=None
+    ) -> NoReturn:
+        """Answer a value that cannot be stored with a 422.
+
+        The member sees one ``parse_error`` row per device and reason in 15 minutes, naming
+        the field and a short cause, never the value.
+        """
+        if set_key_if_absent(f"ingest:parse_error:{entity.id}", "1", ttl=_PARSE_ERROR_LOG_SECONDS):
+            self.ingestion_svc.log_ingestion_error(
+                self.client_ip, device_type, IngestionErrorReason.PARSE_ERROR,
+                str(exc), None, device,
+            )
+        raise HTTPException(status_code=422, detail=f"{exc.field} cannot be stored") from exc

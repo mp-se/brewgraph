@@ -62,6 +62,11 @@ async def _process_chamber(payload: dict, ctx: IngestContext) -> Response:
     _check_device_request_quota(token)
     temp_unit = payload.get("temp_units", "C")
 
+    # Liveness is recorded for any request that names a registered device, whatever the answer.
+    known = ctx.ingestion_svc.resolve_device(token, payload.get("id") or None, "chamber_controller")
+    if known is not None:
+        ctx.ingestion_svc.stamp_device_last_seen(known)
+
     raw_beer = payload.get("beer_temperature")
     raw_fridge = payload.get("fridge_temperature")
     temperature = _parse_temp(raw_beer, temp_unit) if raw_beer is not None else None
@@ -71,6 +76,7 @@ async def _process_chamber(payload: dict, ctx: IngestContext) -> Response:
         device = ctx.ingestion_svc.write_temp(
             token, temperature, fridge_temp=fridge_temp, rssi=payload.get("rssi"),
             battery=payload.get("battery"),
+            battery_percent=payload.get("battery_percent"),
             device_id=payload.get("id") or None,
         )
     except HTTPException:

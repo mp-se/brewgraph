@@ -18,6 +18,8 @@ FSTRING_SQL = re.compile(r"""(?:text|execute)\(\s*f["']""")
 REVIEWED = {
     # table/column names from literal lists; identifiers are quoted with the dialect's preparer
     "tests/conftest.py": 2,
+    # The migration idempotence test uses literal table and column names to model a pre-existing schema.
+    "tests/test_migration_battery_percent.py": 1,
     # enum type names from a literal tuple, in the frozen baseline migration
     "migrations/versions/000_initial_schema.py": 1,
 }

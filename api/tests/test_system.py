@@ -53,7 +53,7 @@ def test_info(app_client):
     assert r.status_code == 200
     data = json.loads(r.text)
     assert "version" in data
-    assert data["version"] == "2.0.0"
+    assert data["version"] == "0.9.0"
     assert "databaseOk" in data
 
 

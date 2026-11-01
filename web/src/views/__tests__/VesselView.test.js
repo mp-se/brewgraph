@@ -9,7 +9,7 @@
  * See LICENSE for details.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import VesselView from '../VesselView.vue'
@@ -212,7 +212,8 @@ describe('VesselView device pairing', () => {
 
     expect(wrapper.text()).not.toContain('Log Temperature')
     expect(wrapper.text()).not.toContain('Log Pressure')
-    expect(wrapper.text()).toContain('Device Setup')
+    expect(wrapper.text()).toContain('Devices')
+    expect(wrapper.text()).not.toContain('Device Setup')
   })
 
   it('keeps disabled save and pour actions idle until their own request starts', async () => {
@@ -225,8 +226,60 @@ describe('VesselView device pairing', () => {
     expect(wrapper.find('.app-spinner').exists()).toBe(false)
   })
 
+  describe('device setup panel and releases', () => {
+    beforeEach(() => {
+      deviceStoreMock.devices = [
+        { id: 'device-pressure-1', name: 'P1', vesselId: 'vessel-1', deviceType: 'pressuremon', token: 'p-token-1' },
+        { id: 'device-pressure-2', name: 'P2', vesselId: 'vessel-9', deviceType: 'pressuremon', token: 'p-token-2' }
+      ]
+      vesselStoreMock.vesselList.push({ id: 'vessel-9', name: 'Other keg' })
+    })
+    afterEach(() => {
+      vi.restoreAllMocks()
+      vesselStoreMock.vesselList = vesselStoreMock.vesselList.filter((v) => v.id !== 'vessel-9')
+    })
+
+    it('is collapsed by default when a device is paired, and expands on click', async () => {
+      const wrapper = mountWrapper()
+      await vi.waitUntil(() => wrapper.vm.vessel != null)
+
+      expect(wrapper.find('[data-testid="device-setup"]').exists()).toBe(true)
+      expect(wrapper.text()).not.toContain('p-token-1')
+      await wrapper.get('[data-testid="device-setup-toggle"]').trigger('click')
+      expect(wrapper.text()).toContain('/ingest/pressuremon')
+      expect(wrapper.text()).toContain('p-token-1')
+    })
+
+    it('lists the replaced holder and the previous vessel of the new device', async () => {
+      const wrapper = mountWrapper()
+      await vi.waitUntil(() => wrapper.vm.vessel != null)
+      wrapper.vm.selectedPressureDeviceId = 'device-pressure-2'
+
+      expect(wrapper.vm.pendingReleases('vessel-1')).toEqual([
+        'P1 will no longer report for this vessel.',
+        'P2 will be released from Other keg.'
+      ])
+    })
+
+    it('does not save when a release is declined', async () => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const wrapper = mountWrapper()
+      await vi.waitUntil(() => wrapper.vm.vessel != null)
+      wrapper.vm.selectedPressureDeviceId = 'device-pressure-2'
+
+      await wrapper.vm.save()
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(vesselStoreMock.updateVessel).not.toHaveBeenCalled()
+      expect(deviceStoreMock.updateDevice).not.toHaveBeenCalled()
+    })
+  })
+
   describe('device setup instructions', () => {
     const SETUP_TITLE = 'How to configure this device'
+    const openSetup = async (wrapper) => {
+      await wrapper.get('[data-testid="device-setup-toggle"]').trigger('click')
+    }
 
     beforeEach(() => {
       deviceStoreMock.devices = [
@@ -249,6 +302,7 @@ describe('VesselView device pairing', () => {
       const wrapper = mountWrapper()
       await vi.waitUntil(() => wrapper.vm.vessel != null)
 
+      await openSetup(wrapper)
       const text = wrapper.text()
       expect(text.split(SETUP_TITLE).length - 1).toBe(2)
       expect(text).toContain('/ingest/pressuremon')
@@ -263,6 +317,7 @@ describe('VesselView device pairing', () => {
 
       wrapper.vm.selectedPressureDeviceId = 'device-pressure-1'
       await wrapper.vm.$nextTick()
+      await openSetup(wrapper)
       expect(wrapper.text()).toContain('p-token-1')
       expect(wrapper.text()).not.toContain('c-token-1')
 

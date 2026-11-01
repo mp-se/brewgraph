@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from oss.precision import quantised
 from oss.schemas._camel import to_camel
@@ -30,13 +30,13 @@ class PressureReadingBase(BaseModel):
     temperature: Optional[float] = Field(default=None)
     pressure: float
     battery: Optional[float] = Field(default=None)
+    battery_percent: Optional[float] = Field(default=None, allow_inf_nan=False)
     rssi: Optional[float] = Field(default=None)
     run_time: Optional[float] = Field(default=None)
     excluded: bool = Field(default=False)
 
     _quantise_temperature = quantised("temperature", quantity="temperature")
     _quantise_pressure = quantised("pressure", quantity="pressure")
-    _quantise_battery = quantised("battery", quantity="battery")
     _quantise_rssi = quantised("rssi", quantity="signal")
 
 
@@ -50,13 +50,24 @@ class PressureReadingCreate(PressureReadingBase):
 
 
 class PressureReadingUpdate(PressureReadingBase):
-    """Used when updating a pressure reading."""
+    """Used when updating a pressure reading; omitting the pressure leaves it unchanged."""
+
+    pressure: Optional[float] = Field(default=None)
+
+    @field_validator("pressure")
+    @classmethod
+    def _pressure_not_cleared(cls, value):
+        """A sent pressure is a value; an update never clears one."""
+        if value is None:
+            raise ValueError("pressure cannot be cleared, omit it to leave it unchanged")
+        return value
 
 
 class PressureReadingResponse(PressureReadingCreate):
-    """Full pressure reading response."""
+    """Full pressure reading response; the pressure is null when the device omitted it."""
 
     id: int
+    pressure: Optional[float] = Field(default=None)
 
 
 class PressureChartPoint(BaseModel):

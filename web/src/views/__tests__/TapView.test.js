@@ -58,4 +58,27 @@ describe('TapView token layout', () => {
     expect(wrapper.vm.tap.token).toBe('rotated-tap-token')
     expect(wrapper.get('.device-setup-fragment').text()).toContain('rotated-tap-token')
   })
+
+  it('shows a vessel batch name in the tap assignment options when present', async () => {
+    piniaMocks.tapStore.tapList = [new Tap({ id: 'tap-1', name: 'Serving tap', token: 'tap-token' })]
+    piniaMocks.vesselStore.vesselList = [
+      {
+        id: 'vessel-1', name: 'Keg 3', batchName: 'Pale Ale', vesselType: 'keg',
+        status: 'serving', tapId: null
+      },
+      {
+        id: 'vessel-2', name: 'Empty Keg', batchName: null, vesselType: 'keg',
+        status: 'conditioning', tapId: null
+      }
+    ]
+    const wrapper = mount(TapView, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.vm.vesselOptions).toContainEqual({ label: 'Keg 3 — Pale Ale', value: 'vessel-1' })
+    expect(wrapper.vm.vesselOptions).toContainEqual({ label: 'Empty Keg', value: 'vessel-2' })
+    expect(wrapper.vm.vesselOptions.some(({ label }) => label === 'Empty Keg — null')).toBe(false)
+
+    wrapper.unmount()
+    piniaMocks.vesselStore.vesselList = []
+  })
 })

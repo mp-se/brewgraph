@@ -22,6 +22,9 @@ def _detect_device_type(payload: dict) -> Optional[DeviceType]:
         ("maxVolume", DeviceType.KEGMON),
         ("pressure", DeviceType.PRESSUREMON),
         ("pressure_units", DeviceType.PRESSUREMON),
+        ("pressure-unit", DeviceType.PRESSUREMON),
+        ("pressure_unit", DeviceType.PRESSUREMON),
+        ("pressure1", DeviceType.PRESSUREMON),
         ("beer_temperature", DeviceType.CHAMBER_CONTROLLER),
         ("fridge_temperature", DeviceType.CHAMBER_CONTROLLER),
         # GravityMon's HTTP-push template names the scale key "gravity-unit". It is checked

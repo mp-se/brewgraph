@@ -35,6 +35,7 @@ from core.models import Base
 from core.openapi_tags import OPENAPI_TAGS
 from core.schema_drift import warn_on_drift
 from core.schemas.errors import ERROR_RESPONSES
+from core.utils import loggable_path
 from oss.routers import batches as batches_router
 from oss.routers import batch_readings as batch_readings_router
 from oss.routers import batch_steps as batch_steps_router
@@ -223,7 +224,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     _validation_logger.log(
         logging.ERROR if exc.status_code >= 500 else logging.WARNING,
         "HTTP %s on %s %s (requestId=%s): %s",
-        exc.status_code, request.method, request.url.path, request_id, message,
+        exc.status_code, request.method, loggable_path(request), request_id, message,
     )
     return JSONResponse(
         {

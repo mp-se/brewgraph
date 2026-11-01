@@ -21,7 +21,7 @@ from core.cache import delete_key, exist_key, increment_key, key_ttl
 from core.config import get_settings
 from core.errors import ApiError
 from core.log import system_log_security
-from core.utils import get_client_ip, truncate_ip
+from core.utils import get_client_ip, loggable_path, truncate_ip
 from oss.extensions.throttle import ThrottleLimits, oss_throttle_provider
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,7 @@ def api_key_auth(request: Request, api_key: Optional[str] = Depends(_bearer_toke
         delete_key(fail_key)
         return AuthContext()
 
-    path = request.url.path
+    path = loggable_path(request)
     token_present = "present" if api_key else "missing"
 
     failures = increment_key(fail_key, settings.auth_block_seconds)

@@ -241,7 +241,7 @@
         <template v-if="!isNew()">
           <div class="row q-col-gutter-sm q-mt-sm">
             <div class="col-md-12"><hr /></div>
-            <div class="col-md-12"><p class="text-subtitle2">Device Setup</p></div>
+            <div class="col-md-12"><p class="text-subtitle2">Devices</p></div>
             <div class="col-md-6">
               <AppSelect
                 v-model="selectedPressureDeviceId"
@@ -254,13 +254,6 @@
                 <DeviceColorSwatch :color="selectedPressureDevice.deviceColor" class="q-mr-xs" />
                 {{ selectedPressureDevice.deviceColor }}
               </div>
-              <DeviceSetupFragment
-                v-if="selectedPressureDevice"
-                :key="selectedPressureDevice.id"
-                :device-type="selectedPressureDevice.deviceType"
-                :token="selectedPressureDevice.token"
-                :has-readings="!!selectedPressureDevice.lastSeen"
-              />
             </div>
             <div class="col-md-6">
               <AppSelect
@@ -274,16 +267,44 @@
                 <DeviceColorSwatch :color="selectedChamberDevice.deviceColor" class="q-mr-xs" />
                 {{ selectedChamberDevice.deviceColor }}
               </div>
-              <DeviceSetupFragment
-                v-if="selectedChamberDevice"
-                :key="selectedChamberDevice.id"
-                :device-type="selectedChamberDevice.deviceType"
-                :token="selectedChamberDevice.token"
-                :has-readings="!!selectedChamberDevice.lastSeen"
-              />
             </div>
           </div>
         </template>
+
+        <!-- Ingest URL and token of the paired devices; collapsed until asked for. -->
+        <div v-if="!isNew() && (selectedPressureDevice || selectedChamberDevice)" class="row q-col-gutter-sm q-mt-sm" data-testid="device-setup">
+          <div class="col-md-12">
+            <div class="app-legacy-card">
+              <div
+                class="app-legacy-card__header row justify-between items-center"
+                style="cursor: pointer"
+                data-testid="device-setup-toggle"
+                @click="deviceSetupOpen = !deviceSetupOpen"
+              >
+                <span>Device Setup</span>
+                <q-icon :name="deviceSetupOpen ? 'expand_less' : 'expand_more'" />
+              </div>
+              <div v-if="deviceSetupOpen" class="app-legacy-card__body row q-col-gutter-sm">
+                <div v-if="selectedPressureDevice" class="col-md-6">
+                  <DeviceSetupFragment
+                    :key="selectedPressureDevice.id"
+                    :device-type="selectedPressureDevice.deviceType"
+                    :token="selectedPressureDevice.token"
+                    :has-readings="!!selectedPressureDevice.lastSeen"
+                  />
+                </div>
+                <div v-if="selectedChamberDevice" class="col-md-6">
+                  <DeviceSetupFragment
+                    :key="selectedChamberDevice.id"
+                    :device-type="selectedChamberDevice.deviceType"
+                    :token="selectedChamberDevice.token"
+                    :has-readings="!!selectedChamberDevice.lastSeen"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="row q-col-gutter-sm q-mt-sm">
           <div class="col-md-12"><hr /></div>
@@ -360,6 +381,7 @@ const selectedPressureDeviceId = ref(null)
 const selectedChamberDeviceId = ref(null)
 const savedPressureDeviceId = ref(null)
 const savedChamberDeviceId = ref(null)
+const deviceSetupOpen = ref(false)
 const selectedPressureDevice = computed(() =>
   deviceStore.devices.find((device) => device.id === selectedPressureDeviceId.value) ?? null
 )
@@ -378,6 +400,31 @@ function loadDeviceAssignments(vesselId) {
   selectedChamberDeviceId.value = chamberDev?.id ?? null
   savedPressureDeviceId.value = selectedPressureDeviceId.value
   savedChamberDeviceId.value = selectedChamberDeviceId.value
+}
+
+// Every device that stops serving a vessel because of the pending selection: the previous
+// holder of a role on this vessel, and the earlier vessel of a device that is moved here.
+function pendingReleases(vesselId) {
+  const releases = []
+  const roles = [
+    { newId: selectedPressureDeviceId.value, oldId: savedPressureDeviceId.value },
+    { newId: selectedChamberDeviceId.value, oldId: savedChamberDeviceId.value }
+  ]
+  for (const { newId, oldId } of roles) {
+    if (newId === oldId) continue
+    const oldDev = oldId && deviceStore.devices.find((d) => d.id === oldId)
+    if (oldDev) releases.push(`${oldDev.name || oldDev.chipId || 'The device'} will no longer report for this vessel.`)
+    const newDev = newId && deviceStore.devices.find((d) => d.id === newId)
+    if (newDev?.vesselId && newDev.vesselId !== vesselId) {
+      const from = vesselStore.vesselList.find((v) => v.id === newDev.vesselId)?.name ?? 'another vessel'
+      releases.push(`${newDev.name || newDev.chipId || 'The device'} will be released from ${from}.`)
+    }
+  }
+  return releases
+}
+
+function confirmReleases(vesselId) {
+  return pendingReleases(vesselId).every((message) => window.confirm(message + ' Continue?'))
 }
 
 async function syncDeviceAssignments(vesselId) {
@@ -526,6 +573,7 @@ onMounted(async () => {
 
 const save = async () => {
   logDebug('VesselView.save()')
+  if (!confirmReleases(isNew() ? null : vessel.value.id)) return
   global.clearMessages()
 
   isSaving.value = true
@@ -593,6 +641,8 @@ defineExpose({
   selectedPressureDeviceId,
   selectedChamberDeviceId,
   loadDeviceAssignments,
+  deviceSetupOpen,
+  pendingReleases,
   syncDeviceAssignments,
   isNew,
   isSaving,

@@ -17,6 +17,7 @@ from core.enums import IngestionErrorReason
 from core.events import notify_clients
 from oss.extensions.tenant import DEFAULT_TENANT_ID
 from oss.jobs.pour_forward import enqueue_forward
+from oss.services.ingestion import UnstorableValueError
 
 from ._shared import IngestContext, _check_device_request_quota
 
@@ -49,6 +50,8 @@ async def _process_pour(payload: dict, ctx: IngestContext) -> Response:
     with ctx.throttle_budget(tap.id, ctx.auth.ingest_interval_seconds):
         try:
             pour = ctx.ingestion_svc.write_pour(tap, payload)
+        except UnstorableValueError as exc:
+            ctx.reject_unstorable("kegmon", exc, tap)
         except ValueError as exc:
             ctx.ingestion_svc.log_ingestion_error(
                 ctx.client_ip, "kegmon", IngestionErrorReason.PARSE_ERROR,

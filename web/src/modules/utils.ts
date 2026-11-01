@@ -87,7 +87,9 @@ export function getFormattedTemperature(temp: number | null | undefined): string
   return Number(temp).toFixed(1) + ' °C'
 }
 
-export function getFormattedPressure(pressure: number): string {
+// A reading whose device omitted the pressure shows "--", never a zero.
+export function getFormattedPressure(pressure: number | null | undefined): string {
+  if (pressure === null || pressure === undefined) return '--'
   if (config.isPressurePSI) {
     return Number(pressure).toFixed(1) + ' PSI'
   }
@@ -197,7 +199,7 @@ interface PressureStats {
 
 interface PressureReading {
   excluded: boolean
-  pressure: number
+  pressure: number | null
   temperature: number | null
   createdAt: string
 }
@@ -207,8 +209,13 @@ export function getPressureDataAnalytics(pressureList: PressureReading[]): Press
   const raw = readingStats(pressureList, {
     getValue: (reading) => reading.pressure,
     getCreated: (reading) => reading.createdAt,
-    isValidTemperature: (temperature) => temperature >= -270
+    isValidTemperature: (temperature) => temperature >= -270,
+    // Readings can be negative (uncalibrated sensor, vacuum), so seed from the data itself.
+    initialValueMin: Infinity,
+    initialValueMax: -Infinity
   })
+  // Nothing to aggregate (no readings, or none with a pressure): the seeded infinities stay.
+  if (!Number.isFinite(raw.value.min)) raw.value = { min: 0, max: 0 }
   const stats: PressureStats = { ...raw, pressure: { ...raw.value, minString: '', maxString: '' }, temperature: { ...raw.temperature, minString: '', maxString: '' } }
 
   stats.pressure.min = config.isPressurePSI
@@ -259,7 +266,7 @@ interface GravityStats {
 
 interface GravityReading {
   excluded: boolean
-  gravity: number
+  gravity: number | null
   temperature: number | null
   created: string
 }

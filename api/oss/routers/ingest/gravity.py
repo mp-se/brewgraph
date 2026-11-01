@@ -15,6 +15,7 @@ from core.enums import IngestionErrorReason
 from core.events import notify_clients
 from oss.extensions.tenant import DEFAULT_TENANT_ID
 from oss.jobs.gravity_forward import enqueue_forward
+from oss.services.ingestion import UnstorableValueError
 
 from ._shared import IngestContext, _check_device_request_quota
 
@@ -38,6 +39,8 @@ async def _process_gravity(
         )
         raise HTTPException(status_code=401, detail="Device not registered")
 
+    # Liveness is recorded for any request that names a registered device, whatever the answer.
+    ctx.ingestion_svc.stamp_device_last_seen(device)
     try:
         with ctx.throttle_budget(device.id, ctx.auth.ingest_interval_seconds):
             batch, reading = ctx.ingestion_svc.ingest_gravity(device, device_type, payload)
@@ -53,10 +56,13 @@ async def _process_gravity(
                 None, device,
             )
         raise
+    except UnstorableValueError as exc:
+        ctx.reject_unstorable(device_type, exc, device, device)
     # Evaluate dry hop triggers on every new gravity reading
-    ctx.background_tasks.add_task(
-        ctx.ingestion_svc.trigger_dry_hops, batch.id, reading.gravity
-    )
+    if reading.gravity is not None:
+        ctx.background_tasks.add_task(
+            ctx.ingestion_svc.trigger_dry_hops, batch.id, reading.gravity
+        )
     ctx.background_tasks.add_task(notify_clients, "batch", "create", batch.id,
                                    DEFAULT_TENANT_ID, source="gravity")
     ctx.background_tasks.add_task(enqueue_forward, device.id, DEFAULT_TENANT_ID)

@@ -43,7 +43,7 @@ Runs entirely on your local network via Docker Compose. No cloud account require
 | [GravityMon](https://github.com/mp-se/gravitymon) | HTTP / BLE | `/ingest/gravitymon` | Any version |
 | [GravityMon Gateway](https://github.com/mp-se/gravitymon-gateway) | HTTP | `/ingest/gravitymon` | Any version |
 | [PressureMon](https://github.com/mp-se/pressuremon) | HTTP / BLE | `/ingest/pressuremon` | Any version |
-| KegMon | HTTP | `/ingest/kegmon` | Integration in development, not yet released |
+| KegMon | HTTP | server only; the firmware adds `/ingest/kegmon` and `/ingest/kegmon/beer` | Integration in development, not yet released |
 | ChamberCtl | HTTP / BLE | `/ingest/chamber` | Integration in development, not yet released |
 
 Where a device type has no released firmware yet, the ingest endpoint is in place but has not been

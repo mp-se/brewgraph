@@ -14,6 +14,7 @@ const READING = {
   angle: 25.3,
   velocity: 0.4,
   battery: 4.13,
+  batteryPercent: 87.12345,
   rssi: -71,
   runTime: 5,
   excluded: false,
@@ -233,6 +234,7 @@ describe('buildBatchEntry — losslessness', () => {
       angle: 25.3,
       velocity: 0.4,
       battery: 4.13,
+      batteryPercent: 87.12345,
       rssi: -71,
       runTime: 5
     })
@@ -294,6 +296,7 @@ describe('buildBatchEntry — losslessness', () => {
       temperature: 19.2,
       tempType: 'chamber',
       battery: 3.9,
+      batteryPercent: null,
       rssi: -60,
       excluded: false,
       isAggregate: false,

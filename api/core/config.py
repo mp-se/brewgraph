@@ -38,7 +38,7 @@ def bounded_int(name: str, default: int, minimum: int) -> int:
 
 class Settings(BaseSettings):
     """Application settings and configuration parameters."""
-    version: str = "2.0.0"
+    version: str = "0.9.0"
     app_name: str = "BrewGraph API"
     redis_host: str = config("REDIS_HOST", cast=str, default="localhost")
     # Optional Redis AUTH password; empty (default) connects without auth.

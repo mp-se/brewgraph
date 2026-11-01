@@ -34,11 +34,12 @@ export function mapGravityData(gList: GravitySeriesReading[]): ChartPoint[] {
   return gravityPoints(gList, config.isGravitySG, gravityToPlato)
 }
 
-/** Battery voltage points. */
+/** Battery voltage points, skipping readings that carry no battery value. */
 export function mapBatteryData(gList: GravitySeriesReading[]): ChartPoint[] {
   const result: ChartPoint[] = []
 
   gList.forEach((g: GravitySeriesReading) => {
+    if (g.battery == null) return
     result.push({
       x: g.created,
       y: parseFloat(new Number(g.battery).toFixed(2))

@@ -1,4 +1,20 @@
-FROM python:3.13-slim
+# Download target wheels natively so dependency installation avoids QEMU.
+FROM --platform=$BUILDPLATFORM python:3.13-slim AS build
+ARG TARGETARCH
+WORKDIR /build
+COPY requirements/requirements.txt ./requirements.txt
+RUN case "$TARGETARCH" in \
+        amd64) arch=x86_64 ;; \
+        arm64) arch=aarch64 ;; \
+        *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac \
+    && pip install --no-cache-dir --no-deps --only-binary=:all: --target /deps \
+        --platform "manylinux2014_$arch" --platform "manylinux_2_17_$arch" --platform "manylinux_2_28_$arch" \
+        --implementation cp --python-version 3.13 -r requirements.txt \
+    && python -m compileall -q /deps \
+    && mv /deps/bin /scripts
+
+FROM python:3.13-slim AS runtime
 
 WORKDIR /app
 
@@ -9,14 +25,18 @@ ENV PYTHONPATH=/app
 # Install system dependencies and apply security patches
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends gcc libpq-dev \
+    && apt-get install -y --no-install-recommends libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements/requirements.txt /app/requirements.txt
-# Nothing installs packages at runtime; pip only adds its vendored libraries to the image.
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt \
-    && pip uninstall -y pip
+# Runtime package installation is disabled; remove the bundled installer.
+RUN cd /usr/local/lib/python3.13/site-packages \
+    && rm -rf pip pip-* \
+    && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.*
+
+# Copy target-platform dependencies and their command-line entry points.
+COPY --from=build /deps /usr/local/lib/python3.13/site-packages
+COPY --from=build /scripts/uvicorn /usr/local/bin/uvicorn
+COPY --from=build /scripts/alembic /usr/local/bin/alembic
 
 # Copy application code
 COPY core /app/core

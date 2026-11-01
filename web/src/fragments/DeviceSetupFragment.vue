@@ -40,8 +40,19 @@
               </template>
               <tr>
                 <td class="text-weight-medium">Token</td>
-                <td><div class="row items-center q-gutter-sm"><code class="col-grow">{{ token }}</code><app-button type="button" variant="outline-secondary" dense @click="copy(token)"><q-icon name="content_copy" /> Copy</app-button></div></td>
+                <td><div class="row items-center q-gutter-sm"><code class="col-grow">{{ token }}</code><app-button v-if="!tokenIsPlaceholder" type="button" variant="outline-secondary" dense @click="copy(token)"><q-icon name="content_copy" /> Copy</app-button></div></td>
               </tr>
+              <template v-if="setup.tokenInUrl">
+                <tr v-for="variant in urlVariants" :key="variant.key" :data-variant="variant.key">
+                  <td class="text-weight-medium">{{ variant.label }}</td>
+                  <td>
+                    <div class="row items-center q-gutter-sm">
+                      <code class="col-grow">{{ variant.url }}</code>
+                      <app-button v-if="!tokenIsPlaceholder" type="button" variant="outline-secondary" dense @click="copy(variant.url)"><q-icon name="content_copy" /> Copy</app-button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </q-markup-table>
         </template>
@@ -73,6 +84,20 @@ const host = window.location.hostname + (window.location.port ? `:${window.locat
 const serverUrl = computed(() =>
   setup.value?.separateFields ? setup.value.path : `http://${host}${setup.value?.path ?? ''}`
 )
+
+// A token that is not issued in this session is shown as `<token>` and cannot be copied.
+const TOKEN_PLACEHOLDER = '<token>'
+const tokenIsPlaceholder = computed(() => !props.token || props.token === TOKEN_PLACEHOLDER)
+
+// Gravity and pressure devices also accept the token in the URL; both forms need the full URL.
+const urlVariants = computed(() => {
+  const endpoint = `http://${host}${setup.value?.path ?? ''}`
+  const token = tokenIsPlaceholder.value ? TOKEN_PLACEHOLDER : props.token
+  return [
+    { key: 'query', label: 'URL with token in query', url: `${endpoint}?token=${token}` },
+    { key: 'path', label: 'URL with token in path', url: `${endpoint}/${token}` }
+  ]
+})
 
 // Expanded by default on fresh devices (no readings yet); collapsed once posting
 const open = ref(!props.hasReadings)

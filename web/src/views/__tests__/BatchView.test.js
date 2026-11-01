@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import BatchView from '../BatchView.vue'
 import { Batch } from '@/modules/classes'
 
@@ -77,7 +77,8 @@ vi.mock('@/modules/router', () => ({
         name: 'batch-view'
       }
     },
-    push: vi.fn()
+    push: vi.fn(),
+    replace: vi.fn()
   }
 }))
 
@@ -118,6 +119,10 @@ vi.mock('@/fragments/BatchBeerXmlImportFragment.vue', () => ({
   default: { name: 'BatchBeerXmlImportFragment', template: '<div>BatchBeerXmlImportFragment</div>' }
 }))
 
+vi.mock('@/views/BatchGravityGraphView.vue', () => ({ default: { template: '<div data-measurement="gravity">Gravity chart</div>' } }))
+vi.mock('@/views/BatchPressureGraphView.vue', () => ({ default: { template: '<div data-measurement="pressure">Pressure chart</div>' } }))
+vi.mock('@/views/BatchTempChartView.vue', () => ({ default: { template: '<div data-measurement="temp">Temp chart</div>' } }))
+
 describe('BatchView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -140,7 +145,8 @@ describe('BatchView', () => {
     piniaMocks.global.updatedBatchData = ref(0)
 
     // Default mock behavior for router
-    routerMock.currentRoute.value.params.id = 'new'
+    routerMock.currentRoute.value = reactive({ params: { id: 'new' }, query: {} })
+    routerMock.replace.mockImplementation(({ query }) => { routerMock.currentRoute.value.query = query })
     routerMock.push.mockClear()
   })
 
@@ -165,6 +171,43 @@ describe('BatchView', () => {
         }
       }
     })
+
+  describe('Measurements', () => {
+    it('waits for batch counts before mounting the first measurement view', async () => {
+      let finishBatch
+      routerMock.currentRoute.value.params.id = 'pressure-batch'
+      routerMock.currentRoute.value.query = { tab: 'measurements' }
+      piniaMocks.batchStore.getBatch.mockReturnValue(new Promise((resolve) => { finishBatch = resolve }))
+      const wrapper = mountWrapper()
+      expect(wrapper.find('[aria-label="Measurements"]').exists()).toBe(false)
+      finishBatch(new Batch({ id: 'pressure-batch', name: 'Pressure', pressureCount: 2 }))
+      await flushPromises()
+      expect(wrapper.find('[data-measurement="pressure"]').exists()).toBe(true)
+      expect(wrapper.find('[data-measurement="gravity"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('keeps the editor available and preserves the measurement choice when changing tabs', async () => {
+      routerMock.currentRoute.value.params.id = 'pressure-batch'
+      piniaMocks.batchStore.getBatch.mockResolvedValue(new Batch({ id: 'pressure-batch', name: 'Pressure', pressureCount: 2 }))
+      const wrapper = mountWrapper()
+      await flushPromises()
+      expect(wrapper.get('.batch-editor-layout').isVisible()).toBe(true)
+      await wrapper.vm.selectBatchTab('measurements')
+      await flushPromises()
+      expect(wrapper.find('[data-measurement="pressure"]').exists()).toBe(true)
+      const fragment = wrapper.findComponent({ name: 'BatchMeasurementsFragment' })
+      await fragment.vm.selectMeasurementView('temp')
+      await flushPromises()
+      await wrapper.vm.selectBatchTab('batch')
+      await flushPromises()
+      expect(wrapper.get('.batch-editor-layout').isVisible()).toBe(true)
+      await wrapper.vm.selectBatchTab('measurements')
+      await flushPromises()
+      expect(wrapper.find('[data-measurement="temp"]').exists()).toBe(true)
+      wrapper.unmount()
+    })
+  })
 
   describe('Rendering', () => {
     it('should render batch view container', () => {

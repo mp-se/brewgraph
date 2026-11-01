@@ -14,7 +14,12 @@
     <AppPageHeader title="Batch" />
 
     <template v-if="batch != null">
-      <div class="row q-col-gutter-lg batch-editor-layout">
+      <div v-if="!isNew()" class="app-button-group q-mb-md" role="group" aria-label="Batch tabs">
+        <app-button type="button" :variant="activeBatchTab === 'batch' ? 'primary' : 'outline-secondary'" :aria-pressed="activeBatchTab === 'batch'" @click="selectBatchTab('batch')">Batch</app-button>
+        <app-button type="button" :variant="activeBatchTab === 'measurements' ? 'primary' : 'outline-secondary'" :aria-pressed="activeBatchTab === 'measurements'" @click="selectBatchTab('measurements')">Measurements</app-button>
+      </div>
+      <BatchMeasurementsFragment v-if="!isNew() && activeBatchTab === 'measurements'" :key="batch.id" :batch="batch" />
+      <div v-show="activeBatchTab === 'batch'" class="row q-col-gutter-lg batch-editor-layout">
       <div :class="!isNew() ? 'col-md-9 batch-editor-layout__main' : 'col-md-12 batch-editor-layout__main'">
       <form
         ref="batchForm"
@@ -149,6 +154,7 @@ import BatchVesselsFragment from '@/fragments/BatchVesselsFragment.vue'
 import BatchDryHopsFragment from '@/fragments/BatchDryHopsFragment.vue'
 import BatchDetailsFormFragment from '@/fragments/BatchDetailsFormFragment.vue'
 import BatchEditorActions from '@/components/BatchEditorActions.vue'
+import BatchMeasurementsFragment from '@/fragments/BatchMeasurementsFragment.vue'
 import { useDeviceOptions } from '@/modules/useDeviceOptions'
 import {
   parseFermentationStepsForEditor,
@@ -159,6 +165,16 @@ import {
 import { persistDryHops } from '@/modules/dryHopEditor'
 
 const batch = ref(null)
+const activeBatchTab = computed(() => {
+  const query = router.currentRoute.value.query ?? {}
+  return query.tab === 'measurements' || ['gravity', 'pressure', 'temp'].includes(query.tab) || (!query.tab && query.view)
+    ? 'measurements' : 'batch'
+})
+
+function selectBatchTab(tab) {
+  void router.replace({ query: { ...(router.currentRoute.value.query ?? {}), tab } })
+}
+
 const batchSaved = ref(null)
 const showValidation = ref(false)
 const isSaving = ref(false)

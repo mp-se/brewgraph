@@ -15,12 +15,13 @@ from core.enums import IngestionErrorReason
 from core.events import notify_clients
 from oss.extensions.tenant import DEFAULT_TENANT_ID
 from oss.jobs.pressure_forward import enqueue_forward
+from oss.services.ingestion import UnstorableValueError
 
 from ._shared import IngestContext, _check_device_request_quota
 
 
 async def _process_pressure(payload: dict, ctx: IngestContext) -> Response:
-    """Core pressure processing logic (shared across endpoints)."""
+    """Process validated pressure, pressure_units and temp_units in their canonical keys."""
     token = payload.get("token") or None
     _check_device_request_quota(token)
     device = ctx.ingestion_svc.resolve_device(token, payload.get("id"), "pressuremon")
@@ -31,6 +32,8 @@ async def _process_pressure(payload: dict, ctx: IngestContext) -> Response:
         )
         raise HTTPException(status_code=401, detail="Device not registered")
 
+    # Liveness is recorded for any request that names a registered device, whatever the answer.
+    ctx.ingestion_svc.stamp_device_last_seen(device)
     try:
         with ctx.throttle_budget(device.id, ctx.auth.ingest_interval_seconds):
             ctx.ingestion_svc.ingest_pressure(device, payload)
@@ -43,6 +46,8 @@ async def _process_pressure(payload: dict, ctx: IngestContext) -> Response:
                 None, device,
             )
         raise
+    except UnstorableValueError as exc:
+        ctx.reject_unstorable("pressuremon", exc, device, device)
 
     # A pressuremon is mounted on either a vessel or a batch — report whichever
     # entity the reading actually landed on, so clients refresh just that one.

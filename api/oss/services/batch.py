@@ -19,7 +19,7 @@ from starlette.exceptions import HTTPException
 
 from core.enums import BatchStatus
 from core.models.registry import resolve_model
-from oss.schemas.batch import BatchCreate, BatchUpdate
+from oss.schemas.batch import BatchCreate, BatchUpdate, abv_from_gravity
 from oss.services.base import BaseService
 
 Batch = resolve_model("Batch")
@@ -164,7 +164,31 @@ class BatchService(BaseService[Batch, BatchCreate, BatchUpdate]):
             if updates:
                 obj = obj.model_copy(update=updates)
 
+        obj = self._apply_planned_abv(db_obj, obj, data)
+
         return super().update(item_id, obj)
+
+    @staticmethod
+    def _apply_planned_abv(db_obj: Any, obj: BatchUpdate, data: dict) -> BatchUpdate:
+        """Recalculate the planned ABV when og or fg changes and abv itself does not.
+
+        A client that sends the whole form repeats every unchanged field, so "changed" means
+        "differs from the stored value". An abv changed in the same request wins. Subclasses
+        that persist through ``BaseService.update`` directly call this too, or the
+        recalculation never reaches them.
+        """
+
+        def _changed(name: str) -> bool:
+            return name in data and data[name] != getattr(db_obj, name)
+
+        if not _changed("abv") and (_changed("og") or _changed("fg")):
+            planned = abv_from_gravity(
+                data["og"] if "og" in data else db_obj.og,
+                data["fg"] if "fg" in data else db_obj.fg,
+            )
+            if planned is not None:
+                obj = obj.model_copy(update={"abv": planned})
+        return obj
 
     def list(self) -> List[Batch]:
         """Return all non-deleted batches."""
@@ -331,6 +355,7 @@ class BatchService(BaseService[Batch, BatchCreate, BatchUpdate]):
             .where(
                 GravityReading.batch_id == batch_id,
                 ~GravityReading.excluded,
+                GravityReading.gravity.isnot(None),
             )
             .order_by(GravityReading.created_at.asc())
             .limit(1)
@@ -343,6 +368,7 @@ class BatchService(BaseService[Batch, BatchCreate, BatchUpdate]):
             .where(
                 GravityReading.batch_id == batch_id,
                 ~GravityReading.excluded,
+                GravityReading.gravity.isnot(None),
             )
             .order_by(GravityReading.created_at.desc())
             .limit(1)

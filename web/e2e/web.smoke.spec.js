@@ -520,9 +520,13 @@ test.describe('batch editor', () => {
   test('a gravity device shows its server URL and token, like the pressure device', async ({ page }) => {
     await openBatch(page)
     await expect(page.getByText('No setup instructions available')).toHaveCount(0)
-    await expect(page.getByText('http://127.0.0.1:5175/ingest/gravitymon')).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/gravitymon', { exact: true })).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/gravitymon?token=smoke-token', { exact: true })).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/gravitymon/smoke-token', { exact: true })).toBeVisible()
     await expect(page.getByText('smoke-token', { exact: true })).toBeVisible()
-    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon')).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon', { exact: true })).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon?token=pressure-token', { exact: true })).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon/pressure-token', { exact: true })).toBeVisible()
     await expect(page.getByText('pressure-token', { exact: true })).toBeVisible()
     await expect(page.getByText('Server URL', { exact: true })).toHaveCount(3)
   })
@@ -620,11 +624,15 @@ test.describe('vessel editor', () => {
 
   test('the paired pressure and chamber devices show their server URL and token, until the picker is cleared', async ({ page }) => {
     await openVessel(page)
+    await expect(page.getByText('Server URL', { exact: true })).toHaveCount(0)
+    await page.getByTestId('device-setup-toggle').click()
     await expect(page.getByText('Server URL', { exact: true })).toHaveCount(2)
     await expect(page.getByText('Token', { exact: true })).toHaveCount(2)
-    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon')).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon', { exact: true })).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon?token=pressure-token', { exact: true })).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/pressuremon/pressure-token', { exact: true })).toBeVisible()
     await expect(page.getByText('pressure-token', { exact: true })).toBeVisible()
-    await expect(page.getByText('http://127.0.0.1:5175/ingest/chamber')).toBeVisible()
+    await expect(page.getByText('http://127.0.0.1:5175/ingest/chamber', { exact: true })).toBeVisible()
     await expect(page.getByText('chamber-token', { exact: true })).toBeVisible()
 
     await clearPicker(page, 'Pressure Device')

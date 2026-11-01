@@ -8,6 +8,7 @@
 # See LICENSE for details.
 
 """Tests for chamber/temperature ingestion endpoints."""
+import json
 import uuid
 from unittest.mock import patch
 
@@ -259,6 +260,24 @@ def test_chamber_without_battery_still_ingests(app_client):
     ]
 
 
+def test_chamber_battery_percent_is_stored_without_conversion(app_client):
+    """A reported percentage is stored on every temperature row as received."""
+    truncate_database()
+    device = _create_device(app_client, "CHMP01", "gravitymon")
+    batch = app_client.post("/batches", json={"name": "Percent B"}, headers=headers).json()
+    _assign_device_to_batch(app_client, device["id"], batch["id"])
+
+    response = app_client.post("/ingest/chamber", json={
+        "current_mode": "R", "token": device["token"],
+        "beer_temperature": 18.5, "fridge_temperature": 4.25,
+        "temp_units": "C", "battery_percent": 137.12345,
+    })
+    assert response.status_code == 200
+
+    rows = _temp_rows(batch_id=batch["id"])
+    assert [row.battery_percent for row in rows] == [137.12345, 137.12345]
+
+
 
 def test_chamber_fridge_only_is_tagged_chamber_not_beer(app_client):
     """A lone fridge-temp is stored as `chamber`, not mislabelled `beer`."""
@@ -469,16 +488,20 @@ def test_chamber_accepts_a_poll_with_no_current_mode(app_client):
     assert "mode" in r.json()
 
 
-def test_chamber_still_rejects_an_invalid_current_mode(app_client):
-    """Optional is not unvalidated — a value outside the enum is still refused."""
+@pytest.mark.parametrize("ignored", [
+    {"current_mode": "Z"}, {"current_mode": 5}, {"current_target": "warm"},
+    {"current_target": None}, {"id": 42},
+])
+def test_chamber_ignores_fields_it_does_not_store(app_client, ignored):
+    """`current_mode` and `current_target` are never read, so whatever they hold is no 422."""
     truncate_database()
     device = _create_device(app_client, "CHMNM02", DeviceType.CHAMBER_CONTROLLER.value)
 
     r = app_client.post(
         "/ingest/chamber",
-        json={"token": device["token"], "beer_temperature": 18.5, "current_mode": "Z"},
+        json={"token": device["token"], "beer_temperature": 18.5, **ignored},
     )
-    assert r.status_code == 422
+    assert r.status_code == 200
 
 
 def test_chamber_without_token_or_id_returns_422(app_client):
@@ -652,3 +675,96 @@ def test_chamber_fridge_temp_fahrenheit_conversion(app_client):
     }
     r = app_client.post("/ingest/chamber", json=payload)
     assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# A temperature is stored as received
+# ---------------------------------------------------------------------------
+
+def _chamber_batch(app_client, chip_id: str) -> tuple:
+    """A chamber device attached to a new batch; return (device, batch)."""
+    truncate_database()
+    device = _create_device(app_client, chip_id, DeviceType.CHAMBER_CONTROLLER.value)
+    batch = app_client.post("/batches", json={"name": "Stored B"}, headers=headers).json()
+    _assign_device_to_batch(app_client, device["id"], batch["id"])
+    return device, batch
+
+
+@pytest.mark.parametrize("temperature, unit, expected", [
+    (150.0, "C", 150.0), (212.0, "F", 100.0), (-300.0, "C", -300.0), (400.0, "C", 400.0),
+])
+def test_chamber_temperature_has_no_range(app_client, temperature, unit, expected):
+    """Beer and fridge temperatures are stored as received; none of them is a 500."""
+    device, batch = _chamber_batch(app_client, "CHMR01")
+    r = app_client.post("/ingest/chamber", json={
+        "token": device["token"], "beer_temperature": temperature,
+        "fridge_temperature": temperature, "temp_units": unit,
+    })
+    assert r.status_code == 200
+    rows = _temp_rows(batch_id=batch["id"])
+    assert [(x.temp_type, round(x.temperature, 2)) for x in rows] == [
+        ("beer", expected), ("chamber", expected),
+    ]
+
+
+def test_chamber_stored_out_of_range_reading_is_listed(app_client):
+    """A stored reading outside the manual-entry bounds still reads back through the API."""
+    device, batch = _chamber_batch(app_client, "CHMR02")
+    r = app_client.post("/ingest/chamber", json={
+        "token": device["token"], "beer_temperature": 250.0, "rssi": 5, "battery": 11.0,
+    })
+    assert r.status_code == 200
+    r = app_client.get(f"/batches/{batch['id']}/temp", headers=headers)
+    assert r.status_code == 200
+    item = r.json()["items"][0]
+    assert (item["temperature"], item["rssi"], item["battery"]) == (250.0, 5.0, 11.0)
+
+
+def test_chamber_rssi_and_battery_stored_as_received(app_client):
+    """RSSI above zero and a battery above ten volts are stored; neither is a 500."""
+    device, batch = _chamber_batch(app_client, "CHMR03")
+    r = app_client.post("/ingest/chamber", json={
+        "token": device["token"], "beer_temperature": 18.0, "rssi": 7, "battery": 11.5,
+    })
+    assert r.status_code == 200
+    rows = _temp_rows(batch_id=batch["id"])
+    assert (rows[0].rssi, rows[0].battery) == (7.0, 11.5)
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", float("nan"), float("inf")])
+def test_chamber_non_finite_temperature_rejected(app_client, bad):
+    """NaN and infinity cannot be stored: 422."""
+    device, _ = _chamber_batch(app_client, "CHMR04")
+    r = app_client.post("/ingest/chamber", content=json.dumps({
+        "token": device["token"], "beer_temperature": bad,
+    }), headers={"Content-Type": "application/json"})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize("unit", ["f", "F", "c", "C"])
+def test_chamber_temp_units_ignore_case(app_client, unit):
+    """temp_units is accepted in either letter case."""
+    device, _ = _chamber_batch(app_client, "CHMR05")
+    r = app_client.post("/ingest/chamber", json={
+        "token": device["token"], "beer_temperature": 20.0, "temp_units": unit,
+    })
+    assert r.status_code == 200
+
+
+@pytest.mark.parametrize("unit", ["K", "", None, 1])
+def test_chamber_unknown_temp_unit_rejected(app_client, unit):
+    """A temperature unit other than C or F cannot be interpreted: 422."""
+    device, _ = _chamber_batch(app_client, "CHMR06")
+    r = app_client.post("/ingest/chamber", json={
+        "token": device["token"], "beer_temperature": 20.0, "temp_units": unit,
+    })
+    assert r.status_code == 422
+
+
+def test_dispatch_reads_a_plain_temperature_key_as_the_beer_temperature(app_client):
+    """The dispatch endpoint detects a chamber payload from a bare `temperature` key."""
+    device, batch = _chamber_batch(app_client, "CHMR07")
+    r = app_client.post("/ingest/dispatch", json={"token": device["token"], "temperature": 19.5})
+    assert r.status_code == 200
+    rows = _temp_rows(batch_id=batch["id"])
+    assert [(x.temp_type, x.temperature) for x in rows] == [("beer", 19.5)]

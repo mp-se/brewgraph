@@ -185,7 +185,8 @@ const vesselOptions = computed(() => {
       (assignableStatus || isCurrent) &&
       (!v.tapId || isCurrent)
     ) {
-      opts.push({ label: v.name, value: v.id })
+      const label = v.batchName ? `${v.name} — ${v.batchName}` : v.name
+      opts.push({ label, value: v.id })
     }
   })
   return opts

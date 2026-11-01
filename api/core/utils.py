@@ -213,6 +213,16 @@ def _is_trusted_proxy(peer: str | None, trusted: str) -> bool:
     return False
 
 
+def loggable_path(request: Request) -> str:
+    """Request path that is safe to log: the matched route template when there is one.
+
+    A route like ``/api/ingest/ispindel/{token}`` carries a credential in its path;
+    the template logs ``{token}`` instead of the value.
+    """
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or request.url.path
+
+
 def get_client_ip(request: Request) -> str:
     """Extract real client IP address from the request.
 

@@ -25,7 +25,7 @@ export interface ReadingStats {
 }
 
 export interface ReadingStatsOptions<T extends ReadingWithTemperature> {
-  getValue: (reading: T) => number
+  getValue: (reading: T) => number | null
   getCreated: (reading: T) => string
   isValidTemperature?: (temperature: number) => boolean
   initialValueMin?: number
@@ -52,8 +52,8 @@ export function readingStats<T extends ReadingWithTemperature>(
 
   for (const reading of active) {
     const value = options.getValue(reading)
-    if (value > stats.value.max) stats.value.max = value
-    if (value < stats.value.min) stats.value.min = value
+    if (value !== null && value > stats.value.max) stats.value.max = value
+    if (value !== null && value < stats.value.min) stats.value.min = value
     if (
       reading.temperature !== null &&
       (options.isValidTemperature?.(reading.temperature) ?? true)

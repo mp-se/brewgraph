@@ -22,7 +22,7 @@ describe('deviceSetupFor', () => {
     ['gravitymon', '/ingest/gravitymon'],
     ['gravitymon_gateway', '/ingest/gravitymon'],
     ['pressuremon', '/ingest/pressuremon'],
-    ['kegmon', '/ingest/kegmon'],
+    ['kegmon', ''],
     ['chamber_controller', '/ingest/chamber']
   ])('%s posts to %s', (type, path) => {
     expect(deviceSetupFor(type)?.path).toBe(path)

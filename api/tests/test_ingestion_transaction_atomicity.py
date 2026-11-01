@@ -13,7 +13,7 @@
 `flush()`s a staged batch and stages the device link, so a caller can fold it
 into a larger atomic unit. `ingest_gravity`/`ingest_pressure` are that unit:
 liveness (`Device.last_seen`) is stamped and committed independently and
-first (best-effort, mirrors `stamp_tap_last_seen`), then batch-create +
+first by the router (best-effort, mirrors `stamp_tap_last_seen`), then batch-create +
 device-link + reading-write are staged together and committed once. A
 failure anywhere in that staged sequence rolls back the whole thing — no
 orphan batch, no batch-with-no-reading — but the liveness stamp, already
@@ -59,6 +59,7 @@ def test_ingest_gravity_leaves_no_orphan_batch_when_reading_write_fails():
     device = _create_device(session)
 
     svc = IngestionService(session, MagicMock())
+    svc.stamp_device_last_seen(device)
     with patch.object(svc, "write_gravity", side_effect=RuntimeError("boom")):
         with pytest.raises(RuntimeError):
             svc.ingest_gravity(device, "gravitymon", {"gravity": 1.050})

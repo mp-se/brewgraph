@@ -1,4 +1,5 @@
-FROM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS build
+# Static assets are built natively and shared by both target architectures.
+FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS build
 WORKDIR /app
 COPY display/package*.json ./
 RUN npm ci
