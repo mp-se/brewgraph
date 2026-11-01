@@ -2,7 +2,6 @@
 ![release](https://img.shields.io/github/v/release/mp-se/brewgraph?label=latest%20release)
 ![issues](https://img.shields.io/github/issues/mp-se/brewgraph)
 ![pr](https://img.shields.io/github/issues-pr/mp-se/brewgraph)
-
 # BrewGraph
 
 Self-hosted homebrewing telemetry platform. Ingests gravity and pressure readings from physical sensors and tracks batches through their full lifecycle — fermenting → conditioning → kegged or bottled.
@@ -105,6 +104,11 @@ POSTGRES_PASSWORD=replace-with-a-unique-database-password
 EOF
 ```
 
+`API_KEY` may contain only printable ASCII characters (letters a-z A-Z without accents,
+digits and symbols, no spaces). Characters such as Ö, å and ä are not accepted; the API
+refuses to start and logs which position is invalid. See the log with
+`docker compose logs brewgraph-api`.
+
 **3. Start the core services**
 
 ```bash
@@ -185,7 +189,7 @@ docker compose up -d
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | SQLAlchemy URL for the PostgreSQL database. Set automatically by `docker-compose.yaml` |
-| `API_KEY` | Yes | — | Bearer token for authenticated UI and management API requests; ingest endpoints use per-device tokens |
+| `API_KEY` | Yes | — | Bearer token for authenticated UI and management API requests; ingest endpoints use per-device tokens. Printable ASCII only, no spaces (no Ö, å, ä); the API refuses to start otherwise and logs the invalid position |
 | `DB_POOL_SIZE` | No | `20` | PostgreSQL connections kept open per API process (integer >= 1). Ignored for SQLite |
 | `DB_MAX_OVERFLOW` | No | `20` | Extra PostgreSQL connections a process may open beyond `DB_POOL_SIZE` under load (integer >= 0) |
 | `DB_POOL_TIMEOUT` | No | `10` | Seconds a request waits for a free connection before failing (integer >= 1) |
@@ -208,7 +212,7 @@ Each API process can open up to `DB_POOL_SIZE + DB_MAX_OVERFLOW` database connec
 | Variable | Required | Description |
 |---|---|---|
 | `API_HOST` | Yes | Hostname of `brewgraph-api` (e.g. `brewgraph-api`) |
-| `API_KEY` | Yes | Must match the API's `API_KEY` |
+| `API_KEY` | Yes | Must match the API's `API_KEY` (printable ASCII only; the service exits with an error otherwise) |
 
 ### Log sidecar (`brewgraph-log`)
 

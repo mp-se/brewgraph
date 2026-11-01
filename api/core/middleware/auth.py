@@ -173,7 +173,10 @@ def api_key_auth(request: Request, api_key: Optional[str] = Depends(_bearer_toke
         )
 
     logger.info("Validating access token")
-    if hmac.compare_digest(api_key or "", settings.api_key.get_secret_value()):
+    # Compare bytes: a client-supplied token may hold non-ASCII text, which
+    # compare_digest rejects for str arguments.
+    if hmac.compare_digest((api_key or "").encode("utf-8"),
+                           settings.api_key.get_secret_value().encode("utf-8")):
         delete_key(fail_key)
         return AuthContext()
 

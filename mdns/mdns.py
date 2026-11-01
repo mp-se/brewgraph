@@ -159,6 +159,9 @@ if __name__ == "__main__":
     if not api_key:
         logger.error("API_KEY environment variable must be set.")
         raise SystemExit(1)
+    if not all(0x21 <= ord(c) <= 0x7E for c in api_key):
+        logger.error("API_KEY must contain only printable ASCII characters, no spaces.")
+        raise SystemExit(1)
 
     logger.info("Starting BrewGraph mDNS scanner → API at %s", api_host)
     asyncio.run(main())

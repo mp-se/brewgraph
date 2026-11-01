@@ -76,6 +76,9 @@ SKIP_NULL_VALUES = True  # Strip None-valued fields before posting
 # ── v2 ingest endpoints ───────────────────────────────────────────────────────
 _api_base = "http://" + (os.getenv("API_HOST") or "brewgraph-api")
 _api_key = os.getenv("API_KEY", "")
+if not all(0x21 <= ord(_c) <= 0x7E for _c in _api_key):
+    logging.error("API_KEY must contain only printable ASCII characters, no spaces.")
+    raise SystemExit(1)
 
 endpoint_gravity = _api_base + "/api/ingest/gravitymon"
 endpoint_pressure = _api_base + "/api/ingest/pressuremon"

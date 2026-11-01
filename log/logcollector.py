@@ -256,6 +256,9 @@ if __name__ == "__main__":
     if api_host is None or api_key is None:
         logging.error("API_HOST and API_KEY environment variables must be set.")
         raise SystemExit(1)
+    if not all(0x21 <= ord(c) <= 0x7E for c in api_key):
+        logging.error("API_KEY must contain only printable ASCII characters, no spaces.")
+        raise SystemExit(1)
 
     endpoint = f"http://{api_host}/api/devices?pageSize=200"
     headers = {

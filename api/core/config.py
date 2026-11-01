@@ -36,6 +36,30 @@ def bounded_int(name: str, default: int, minimum: int) -> int:
     return value
 
 
+def api_key_setting(name: str = "API_KEY") -> str:
+    """Read the API key from environment variable `name`, or generate one when unset.
+
+    The key travels in an HTTP header, so it must be printable ASCII without whitespace
+    (0x21-0x7E). Raises ValueError naming the variable and the first invalid position
+    (never the key itself), after logging the same message, so startup stops visibly.
+    """
+    value = config(name, cast=str, default=None)
+    if value is None:
+        return generate_api_key(20)
+    problem = "is empty" if value == "" else None
+    for position, char in enumerate(value):
+        if not 0x21 <= ord(char) <= 0x7E:
+            problem = f"has an invalid character U+{ord(char):04X} at position {position}"
+            break
+    if problem:
+        message = (f"Config '{name}' {problem}. It may contain only printable ASCII "
+                   "characters (0x21-0x7E): letters without accents, digits and symbols, "
+                   "no spaces.")
+        logger.error(message)
+        raise ValueError(message)
+    return value
+
+
 class Settings(BaseSettings):
     """Application settings and configuration parameters."""
     version: str = "0.9.0"
@@ -93,7 +117,7 @@ class Settings(BaseSettings):
     database_url: SecretStr = config(
         "DATABASE_URL", cast=str, default="sqlite:///./brewgraph.sqlite"
     )
-    api_key: SecretStr = config("API_KEY", cast=str, default=generate_api_key(20))
+    api_key: SecretStr = api_key_setting()
     brewfather_api_key: SecretStr = config("BREWFATHER_API_KEY", cast=str, default="")
     brewfather_user_key: SecretStr = config("BREWFATHER_USER_KEY", cast=str, default="")
     brewers_friend_api_key: SecretStr = config("BREWERS_FRIEND_API_KEY", cast=str, default="")

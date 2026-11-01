@@ -10,6 +10,7 @@ services:
     environment:
       - API_HOST=brewgraph-api
       # Required: never fall back to a known browser/API credential.
+      # Printable ASCII only, no spaces (no Ö, å, ä); see README.
       - API_KEY=${API_KEY:?Set API_KEY in .env before starting BrewGraph}
     ports:
       - "80:80"
