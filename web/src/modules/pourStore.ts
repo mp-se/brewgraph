@@ -37,13 +37,17 @@ export const usePourStore = defineStore('pourStore', {
       return this.pours
     },
 
-    async listPours(vesselId: string): Promise<StoredPourEvent[] | null> {
-      logDebug('pourStore.listPours()', vesselId)
+    async listPours(vesselId: string, allFills = false): Promise<StoredPourEvent[] | null> {
+      logDebug('pourStore.listPours()', vesselId, allFills)
       const releaseBusy = global.acquireBusy()
       try {
         const all = await fetchAllCursorPages<Record<string, unknown>>(async (cursor) => {
           const path =
-            'vessels/' + vesselId + '/pours?limit=200' + (cursor ? '&cursor=' + cursor : '')
+            'vessels/' +
+            vesselId +
+            '/pours?limit=200' +
+            (allFills ? '&allFills=true' : '') +
+            (cursor ? '&cursor=' + cursor : '')
           const json = await apiJson<{
             items: Record<string, unknown>[]
             has_more: boolean

@@ -74,6 +74,22 @@ describe('usePourStore', () => {
       expect(store.pours.length).toBe(1)
     })
 
+    it('asks for the whole vessel history only when all fills are requested', async () => {
+      const store = usePourStore()
+      const empty = { items: [], has_more: false, next_cursor: null }
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(empty)
+      })
+
+      await store.listPours('v1')
+      await store.listPours('v1', true)
+
+      expect(global.fetch.mock.calls[0][0]).not.toContain('allFills')
+      expect(global.fetch.mock.calls[1][0]).toContain('/vessels/v1/pours?limit=200&allFills=true')
+    })
+
     it('should fetch pours across multiple pages', async () => {
       const store = usePourStore()
       const pour = {

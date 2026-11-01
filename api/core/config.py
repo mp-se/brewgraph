@@ -62,7 +62,7 @@ def api_key_setting(name: str = "API_KEY") -> str:
 
 class Settings(BaseSettings):
     """Application settings and configuration parameters."""
-    version: str = "0.9.0"
+    version: str = "0.9.2"
     app_name: str = "BrewGraph API"
     redis_host: str = config("REDIS_HOST", cast=str, default="localhost")
     # Optional Redis AUTH password; empty (default) connects without auth.
