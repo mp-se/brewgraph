@@ -26,7 +26,7 @@ from core.events import notify_clients
 from oss.extensions.tenant import DEFAULT_TENANT_ID
 from oss.jobs.temp_forward import enqueue_forward
 
-from ._shared import IngestContext, _check_device_request_quota
+from ._shared import IngestContext, _check_device_request_quota, log_dropped_fields
 
 
 def _notify_temp(background_tasks: BackgroundTasks, device) -> None:
@@ -66,6 +66,7 @@ async def _process_chamber(payload: dict, ctx: IngestContext) -> Response:
     known = ctx.ingestion_svc.resolve_device(token, payload.get("id") or None, "chamber_controller")
     if known is not None:
         ctx.ingestion_svc.stamp_device_last_seen(known)
+        log_dropped_fields(ctx, "chamber", known, payload.pop("dropped_fields", []))
 
     raw_beer = payload.get("beer_temperature")
     raw_fridge = payload.get("fridge_temperature")

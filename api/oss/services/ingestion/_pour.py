@@ -9,13 +9,37 @@
 
 """Pour ingestion use case — KegMon tap/vessel volume and pour events."""
 import logging
+import math
 from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from ._utils import PourEvent, StorageVessel, Tap, _required_float
+from core.enums import TempType
+from oss.schemas.temp_reading import TempReadingIngest
+
+from ._utils import NoActiveVesselError, PourEvent, StorageVessel, Tap, _required_float
+
+
+def kegmon_temperature(payload: dict) -> tuple[Optional[float], Optional[str]]:
+    """The optional KegMon temperature in Celsius as ``(value, drop_cause)``.
+
+    Absent gives ``(None, None)``. A number or numeric string that is finite is the value;
+    anything else is dropped with a short cause, never the value itself.
+    """
+    raw = payload.get("temperature")
+    if raw is None:
+        return None, None
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return None, "not a number"
+    try:
+        value = float(raw)
+    except ValueError:
+        return None, "not a number"
+    if not math.isfinite(value):
+        return None, "not a finite number"
+    return value, None
 
 
 class _PourIngestionMixin:
@@ -36,6 +60,19 @@ class _PourIngestionMixin:
         """The reported ``(volume, maxVolume)``, each stored exactly as received."""
         return _required_float(payload, "volume"), _required_float(payload, "maxVolume")
 
+    def _stage_temperature(self, vessel: StorageVessel, payload: dict) -> None:
+        """Stage the payload's temperature as a reading on the vessel, in the pour's commit."""
+        temperature, _ = kegmon_temperature(payload)
+        if temperature is None:
+            return
+        self._temp_svc.build(TempReadingIngest(
+            vessel_id=vessel.id,
+            temperature=temperature,
+            temp_type=TempType.BEER,
+            is_aggregate=False,
+            created_at=datetime.now(UTC),
+        ))
+
     def write_pour(self, tap: Tap, payload: dict) -> Optional[PourEvent]:
         """Apply an authoritative KegMon volume update and optionally record its pour."""
         event_id = payload.get("eventId") or payload.get("event_id")
@@ -47,11 +84,12 @@ class _PourIngestionMixin:
                 return existing
         vessel = self.find_active_vessel_for_tap(tap)
         if vessel is None:
-            raise ValueError(f"No active vessel on tap id={tap.id}")
+            raise NoActiveVesselError(f"No active vessel on tap id={tap.id}")
         previous = vessel.volume_remaining
         volume, max_volume = self._vessel_levels(payload)
         pour_reported = payload.get("pour") is not None
         pour_amount = _required_float(payload, "pour") if pour_reported else None
+        self._stage_temperature(vessel, payload)
         # The volume is the authoritative current level, stored as received. A volume above
         # the reported capacity raises the capacity to it, so volume_remaining <= total_volume
         # still holds.

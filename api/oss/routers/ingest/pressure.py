@@ -17,7 +17,7 @@ from oss.extensions.tenant import DEFAULT_TENANT_ID
 from oss.jobs.pressure_forward import enqueue_forward
 from oss.services.ingestion import UnstorableValueError
 
-from ._shared import IngestContext, _check_device_request_quota
+from ._shared import IngestContext, _check_device_request_quota, log_dropped_fields
 
 
 async def _process_pressure(payload: dict, ctx: IngestContext) -> Response:
@@ -34,6 +34,7 @@ async def _process_pressure(payload: dict, ctx: IngestContext) -> Response:
 
     # Liveness is recorded for any request that names a registered device, whatever the answer.
     ctx.ingestion_svc.stamp_device_last_seen(device)
+    log_dropped_fields(ctx, "pressuremon", device, payload.pop("dropped_fields", []))
     try:
         with ctx.throttle_budget(device.id, ctx.auth.ingest_interval_seconds):
             ctx.ingestion_svc.ingest_pressure(device, payload)

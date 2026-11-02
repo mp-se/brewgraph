@@ -9,6 +9,7 @@
 
 """Extended ingest router tests — dispatch, kegmon, parse errors, and throttle."""
 import hashlib
+import json
 import uuid as _uuid
 from unittest.mock import patch
 
@@ -362,15 +363,141 @@ def test_kegmon_unknown_tap_returns_401(app_client):
     assert r.status_code == 401
 
 
-def test_kegmon_no_active_vessel_returns_409(app_client):
-    """POST /ingest/kegmon with valid tap but no tapped vessel returns 409."""
+def _count_rows(model) -> int:
+    session = create_session()
+    try:
+        return session.query(model).count()
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("extra", [{"pour": 0.5}, {}])
+def test_kegmon_no_active_vessel_is_ignored(app_client, extra):
+    """A pour or level for a tap with no vessel answers 200, stores and logs nothing."""
     truncate_database()
     tap = _create_tap_with_token(app_client, "kegmon-test-tok")
     r = app_client.post(
         "/ingest/kegmon",
-        json={"pour": 0.5, "volume": 10.0, "maxVolume": 19.0, "token": tap["token"]},
+        json={"volume": 10.0, "maxVolume": 19.0, "temperature": 20.0, "token": tap["token"],
+              **extra},
     )
-    assert r.status_code == 409
+    assert r.status_code == 200
+    assert r.text == ""
+    assert _count_rows(resolve_model("PourEvent")) == 0
+    assert _count_rows(resolve_model("TempReading")) == 0
+    assert _count_rows(IngestionLog) == 0
+
+
+def _temps(vessel_id) -> list:
+    session = create_session()
+    try:
+        model = resolve_model("TempReading")
+        rows = session.query(model).filter_by(vessel_id=_uuid.UUID(vessel_id))
+        return [row.temperature for row in rows]
+    finally:
+        session.close()
+
+
+def test_kegmon_pour_with_temperature_stores_a_reading(app_client):
+    """A pour's temperature is stored against the vessel and the pour is recorded."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "pour": 1.0, "volume": 15.0, "maxVolume": 20.0,
+        "temperature": 22.625, "eventId": "t1",
+    })
+    assert r.status_code == 200
+    assert _temps(vessel_id) == [pytest.approx(22.625, abs=0.05)]
+    assert len(_pours(app_client, vessel_id)) == 1
+
+
+def test_kegmon_level_with_temperature_stores_one_reading(app_client):
+    """A level report's temperature is stored once."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": 15.0, "maxVolume": 20.0, "temperature": 5.0,
+    })
+    assert r.status_code == 200
+    assert _temps(vessel_id) == [5.0]
+
+
+def test_kegmon_retried_pour_stores_the_temperature_once(app_client):
+    """The same event sent twice does not store a second reading."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "pour": 1.0, "volume": 15.0, "maxVolume": 20.0,
+            "temperature": 5.0, "eventId": "once"}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert _temps(vessel_id) == [5.0]
+
+
+def test_kegmon_without_temperature_stores_no_reading(app_client):
+    """An absent temperature stores no reading and logs nothing."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": 15.0, "maxVolume": 20.0,
+    })
+    assert r.status_code == 200
+    assert _temps(vessel_id) == []
+    assert _count_rows(IngestionLog) == 0
+
+
+def test_kegmon_numeric_string_temperature_is_dropped_and_logged(app_client):
+    """A numeric string is not a JSON number and is dropped with a parse log."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": 15.0, "maxVolume": 20.0, "temperature": "7.5",
+    })
+    assert r.status_code == 200
+    assert _temps(vessel_id) == []
+    session = create_session()
+    try:
+        row = session.query(IngestionLog).one()
+        assert row.error_detail.startswith("temperature:")
+        assert "7.5" not in row.error_detail
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity", True, {"a": 1}, [1], "warm"])
+def test_kegmon_unusable_temperature_is_dropped_and_logged(app_client, value):
+    """An unusable temperature never refuses the pour; the log names the field, not the value."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "pour": 1.0, "volume": 15.0, "maxVolume": 20.0,
+        "temperature": value, "eventId": "bad-temp",
+    })
+    assert r.status_code == 200
+    assert _temps(vessel_id) == []
+    assert len(_pours(app_client, vessel_id)) == 1
+    session = create_session()
+    try:
+        rows = session.query(IngestionLog).all()
+        assert len(rows) == 1
+        assert rows[0].error_detail.startswith("temperature:")
+        assert "warm" not in rows[0].error_detail
+    finally:
+        session.close()
+
+
+def test_kegmon_non_finite_temperature_literals_are_dropped(app_client):
+    """Bare NaN and Infinity JSON tokens, as some firmware emits, drop the temperature too."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    prefix = json.dumps({"token": tap["token"], "volume": 15.0, "maxVolume": 20.0})[:-1]
+    raw = prefix + ', "temperature": NaN}'
+    r = app_client.post("/ingest/kegmon", content=raw,
+                        headers={"Content-Type": "application/json"})
+    assert r.status_code == 200
+    assert _temps(vessel_id) == []
+
+
+def test_kegmon_temperature_does_not_excuse_a_rejected_volume(app_client):
+    """A payload whose volume is refused stays refused and stores no temperature."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    r = app_client.post("/ingest/kegmon", json={
+        "token": tap["token"], "volume": "NaN", "maxVolume": 20.0, "temperature": 5.0,
+    })
+    assert r.status_code == 422
+    assert _temps(vessel_id) == []
 
 
 def test_kegmon_parse_error_returns_422(app_client):
@@ -677,13 +804,21 @@ def test_unknown_gravity_device_stamps_nothing(app_client):
 
 @pytest.mark.parametrize("field", ["volume", "maxVolume", "pour"])
 @pytest.mark.parametrize("bad", ["abc", "nan", "inf", None])
-def test_kegmon_non_finite_number_rejected(app_client, field, bad):
-    """Text, NaN, infinity and a missing required level cannot be stored."""
-    tap, _ = _kegmon_setup(app_client)
+def test_kegmon_non_finite_number_dropped(app_client, field, bad):
+    """Bad optional pours are dropped; required levels remain 422."""
+    tap, vessel_id = _kegmon_setup(app_client)
     body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0, "pour": 0.3, field: bad}
     r = app_client.post("/ingest/kegmon", json=body)
     if field == "pour" and bad is None:
         assert r.status_code == 200
+    elif field == "pour":
+        assert r.status_code == 200
+        assert len(_pours(app_client, vessel_id)) == 0
+        session = create_session()
+        try:
+            assert field in session.query(IngestionLog).one().error_detail
+        finally:
+            session.close()
     else:
         assert r.status_code == 422
 

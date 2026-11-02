@@ -115,6 +115,7 @@ async def ingest_kegmon(
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
     payload = body.model_dump(by_alias=True)
+    payload["dropped_fields"] = body.dropped_fields
     payload["eventId"] = payload.get("eventId") or request.headers.get("Idempotency-Key")
     return await _process_pour(payload, ctx)
 
@@ -147,6 +148,7 @@ async def ingest_gravitymon(
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
     payload = with_url_token(body.model_dump(by_alias=True), request)
+    payload["dropped_fields"] = body.dropped_fields
     return await _process_gravity(payload, ctx, "gravitymon")
 
 
@@ -166,6 +168,7 @@ async def ingest_ispindel(
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
     payload = with_url_token(body.model_dump(by_alias=True), request)
+    payload["dropped_fields"] = body.dropped_fields
     return await _process_gravity(payload, ctx, "ispindel")
 
 
@@ -185,6 +188,7 @@ async def ingest_pressuremon(
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
     payload = with_url_token(body.model_dump(by_alias=True), request)
+    payload["dropped_fields"] = body.dropped_fields
     return await _process_pressure(payload, ctx)
 
 
@@ -222,7 +226,9 @@ async def ingest_temp(
     logger.info("Endpoint POST /ingest/chamber")
     client_ip = get_client_ip(request)
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
-    return await _process_chamber(body.model_dump(by_alias=True), ctx)
+    payload = body.model_dump(by_alias=True)
+    payload["dropped_fields"] = body.dropped_fields
+    return await _process_chamber(payload, ctx)
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,8 @@ import pytest
 from sqlalchemy import text
 
 from core.config import get_settings
-from core.db import engine
+from core.db import create_session, engine
+from core.models.platform import IngestionLog
 from oss.schemas.ingest import PressureIngestRequest
 from tests.conftest import DEVICE_DEFAULTS, truncate_database
 
@@ -86,11 +87,16 @@ def test_absent_pressure2_is_stored_as_null(app_client):
 
 
 @pytest.mark.parametrize("value", ["not-a-number", "NaN", "Infinity"])
-def test_non_number_pressure2_is_rejected_like_other_fields(app_client, value):
-    """An unusable value is refused as any other invalid field, without being stored."""
+def test_non_number_pressure2_is_dropped_like_other_optional_fields(app_client, value):
+    """An unusable optional value is dropped while the primary pressure is stored."""
     truncate_database()
-    assert _post(app_client, "PRS2X1", pressure2=value).status_code == 422
-    assert not _stored()
+    assert _post(app_client, "PRS2X1", pressure2=value).status_code == 200
+    assert _stored()[0].pressure2 is None
+    session = create_session()
+    try:
+        assert "pressure2" in session.query(IngestionLog).one().error_detail
+    finally:
+        session.close()
 
 
 def test_pressure2_is_not_in_the_api_response(app_client):

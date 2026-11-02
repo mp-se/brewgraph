@@ -11,11 +11,14 @@
 from ._chamber import _ChamberIngestionMixin
 from ._core import _IngestionCoreMixin
 from ._gravity import _GravityIngestionMixin
-from ._pour import _PourIngestionMixin
+from ._pour import _PourIngestionMixin, kegmon_temperature
 from ._pressure import _PressureIngestionMixin
-from ._utils import UnstorableValueError, _safe_float
+from ._utils import NoActiveVesselError, UnstorableValueError, _safe_float
 
-__all__ = ["IngestionService", "UnstorableValueError", "_safe_float"]
+__all__ = [
+    "IngestionService", "NoActiveVesselError", "UnstorableValueError", "kegmon_temperature",
+    "_safe_float",
+]
 
 
 class IngestionService(

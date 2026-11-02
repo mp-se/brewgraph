@@ -5,6 +5,8 @@
 import pytest
 
 from core.config import get_settings
+from core.db import create_session
+from core.models.platform import IngestionLog
 from tests.conftest import DEVICE_DEFAULTS, truncate_database
 
 HEADERS = {
@@ -60,8 +62,8 @@ def test_battery_values_are_independent_and_store_as_received(
 
 @pytest.mark.parametrize("kind", ["gravity", "pressure"])
 @pytest.mark.parametrize("value", ["not-a-number", "NaN", "Infinity"])
-def test_non_finite_battery_percent_is_rejected(app_client, kind, value):
-    """A value that cannot be stored is rejected without clamping or conversion."""
+def test_non_finite_battery_percent_is_dropped(app_client, kind, value):
+    """A bad optional battery percentage is dropped while the reading is stored."""
     truncate_database()
     device_type = "pressuremon" if kind == "pressure" else "gravitymon"
     device = app_client.post("/devices", json={
@@ -75,4 +77,9 @@ def test_non_finite_battery_percent_is_rejected(app_client, kind, value):
         response = app_client.post("/ingest/gravitymon", json={
             **common, "gravity": 1.05, "gravity-unit": "G",
         })
-    assert response.status_code == 422
+    assert response.status_code == 200
+    session = create_session()
+    try:
+        assert "battery_percent" in session.query(IngestionLog).one().error_detail
+    finally:
+        session.close()

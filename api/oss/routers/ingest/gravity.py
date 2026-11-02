@@ -17,7 +17,7 @@ from oss.extensions.tenant import DEFAULT_TENANT_ID
 from oss.jobs.gravity_forward import enqueue_forward
 from oss.services.ingestion import UnstorableValueError
 
-from ._shared import IngestContext, _check_device_request_quota
+from ._shared import IngestContext, _check_device_request_quota, log_dropped_fields
 
 
 async def _process_gravity(
@@ -41,6 +41,7 @@ async def _process_gravity(
 
     # Liveness is recorded for any request that names a registered device, whatever the answer.
     ctx.ingestion_svc.stamp_device_last_seen(device)
+    log_dropped_fields(ctx, device_type, device, payload.pop("dropped_fields", []))
     try:
         with ctx.throttle_budget(device.id, ctx.auth.ingest_interval_seconds):
             batch, reading = ctx.ingestion_svc.ingest_gravity(device, device_type, payload)

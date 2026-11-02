@@ -42,6 +42,10 @@ class UnstorableValueError(ValueError):
         self.cause = cause
 
 
+class NoActiveVesselError(ValueError):
+    """A KegMon report for a tap that has no vessel on it; the router ignores it."""
+
+
 def _safe_float(value, default: Optional[float] = 0.0) -> Optional[float]:
     """Convert value to a float as received; text, absent and NaN/Inf values give default.
 

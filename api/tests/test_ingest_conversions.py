@@ -530,10 +530,11 @@ def test_gravitymon_explicit_null_fields_stored_null(app_client):
     "field", ["gravity", "angle", "battery", "rssi", "velocity", "temperature"]
 )
 @pytest.mark.parametrize("bad", ["abc", "nan", "inf", float("nan"), float("inf"), float("-inf")])
-def test_gravitymon_non_finite_number_rejected(app_client, field, bad):
-    """Text, NaN and infinity cannot be stored: 422."""
-    r, _ = _gravitymon_post(app_client, "GRBD01", **{field: bad})
-    assert r.status_code == 422
+def test_gravitymon_invalid_optional_number_dropped(app_client, field, bad):
+    """Text, NaN and infinity are dropped from optional fields."""
+    r, readings = _gravitymon_post(app_client, "GRBD01", **{field: bad})
+    assert r.status_code == 200
+    assert readings[0][field] is None
 
 
 @pytest.mark.parametrize("unit", ["g", "G", "p", "P"])
@@ -563,12 +564,12 @@ def test_gravitymon_lowercase_temp_unit_converted(app_client):
     assert abs(readings[0]["temperature"] - 20.0) < 0.05
 
 
-def test_gravitymon_numeric_strings_are_numbers(app_client):
-    """A numeric string such as "1.05" is a number."""
+def test_gravitymon_numeric_strings_are_dropped(app_client):
+    """A numeric string is not a JSON number."""
     r, readings = _gravitymon_post(app_client, "GRST01", gravity="1.05", battery="3.9")
     assert r.status_code == 200
-    assert readings[0]["gravity"] == 1.05
-    assert readings[0]["battery"] == 3.9
+    assert readings[0]["gravity"] is None
+    assert readings[0]["battery"] is None
 
 
 def test_gravitymon_fractional_rssi_accepted(app_client):
@@ -668,10 +669,11 @@ def test_pressuremon_absent_optional_fields_stored_null(app_client, field):
 
 @pytest.mark.parametrize("field", ["pressure", "battery", "rssi", "temperature"])
 @pytest.mark.parametrize("bad", ["abc", "nan", "inf", float("nan"), float("inf")])
-def test_pressuremon_non_finite_number_rejected(app_client, field, bad):
-    """Text, NaN and infinity cannot be stored: 422."""
-    r, _ = _pressuremon_post(app_client, "PRBD01", **{field: bad})
-    assert r.status_code == 422
+def test_pressuremon_invalid_optional_number_dropped(app_client, field, bad):
+    """Text, NaN and infinity are dropped from optional fields."""
+    r, readings = _pressuremon_post(app_client, "PRBD01", **{field: bad})
+    assert r.status_code == 200
+    assert readings[0][field] is None
 
 
 def _pressure_gap_post(app_client, device_type, chip_id, path, drop=(), **overrides):

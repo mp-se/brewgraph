@@ -373,11 +373,13 @@ def test_chamber_invalid_temperature_returns_422(app_client):
     assert r.status_code == 422
 
 
-def test_chamber_invalid_fridge_temp_returns_422(app_client):
-    """POST /ingest/chamber with non-numeric fridge-temp returns 422."""
+def test_chamber_invalid_fridge_temp_is_dropped_with_valid_beer_temp(app_client):
+    """A bad optional fridge temperature is dropped when beer temperature is valid."""
     truncate_database()
     truncate_database()
     device = _create_device(app_client, "CHMC01", "gravitymon")
+    batch = app_client.post("/batches", json={"name": "Chamber bad fridge"}, headers=headers).json()
+    _assign_device_to_batch(app_client, device["id"], batch["id"])
     r = app_client.post(
         "/ingest/chamber",
         json={
@@ -386,7 +388,13 @@ def test_chamber_invalid_fridge_temp_returns_422(app_client):
             "fridge_temperature": "invalid"
         }
     )
-    assert r.status_code == 422
+    assert r.status_code == 200
+    session = create_session()
+    try:
+        assert session.query(TempReading).count() == 1
+        assert "fridge_temperature" in session.query(IngestionLog).one().error_detail
+    finally:
+        session.close()
 
 
 def test_chamber_unknown_token_returns_401(app_client):

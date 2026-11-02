@@ -44,6 +44,25 @@ TenantSettings = resolve_model("TenantSettings")  # type: ignore[assignment]
 
 _PARSE_ERROR_LOG_SECONDS = 15 * 60
 
+
+def log_dropped_fields(ctx: "IngestContext", source: str, identity, fields: list[str]) -> None:
+    """Record optional numeric fields dropped by the wire schema, once per identity."""
+    if not fields:
+        return
+    key = (
+        f"ingest:dropped_temperature:{identity.id}"
+        if source == "kegmon" else f"ingest:dropped_fields:{source}:{identity.id}"
+    )
+    if set_key_if_absent(key, "1", ttl=_PARSE_ERROR_LOG_SECONDS):
+        if source == "kegmon" and fields == ["temperature"]:
+            detail = "temperature: not a number; field dropped"
+        else:
+            detail = f"fields: {', '.join(fields)}; field(s) dropped"
+        ctx.ingestion_svc.log_ingestion_error(
+            ctx.client_ip, source, IngestionErrorReason.PARSE_ERROR,
+            detail, None, None if source == "kegmon" else identity,
+        )
+
 router = APIRouter(prefix="/api", tags=["ingest"])  # auth handled per-endpoint via ingest_auth
 
 # Public URLs devices should be configured with. These are the short form the web

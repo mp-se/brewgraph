@@ -4,7 +4,8 @@
 
 """Exact Pydantic wire contracts for public device ingest endpoints."""
 
-from typing import Annotated, Any, Literal, Optional
+import math
+from typing import Annotated, Any, ClassVar, Literal, Optional
 
 from pydantic import (
     AliasChoices,
@@ -12,6 +13,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    StrictFloat,
     model_validator,
 )
 
@@ -19,7 +21,17 @@ from pydantic import (
 # string such as "18.5" is one) and carries no range. NaN and infinity cannot be stored.
 # An absent temperature unit means Celsius and an absent pressure unit means kPa; a unit
 # that is present must be one of its allowed values, whatever its letter case.
-IngestFloat = Annotated[float, Field(allow_inf_nan=False)]
+IngestFloat = Annotated[StrictFloat, Field(allow_inf_nan=False)]
+
+
+def _optional_ingest_float(value):
+    """Drop an optional value unless it is a finite JSON number."""
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value if math.isfinite(value) else None
+
+
+OptionalIngestFloat = Annotated[Optional[float], BeforeValidator(_optional_ingest_float)]
 
 
 def _upper(value):
@@ -52,25 +64,48 @@ class _IngestBase(BaseModel):
     """Device protocols ignore future firmware fields but never rewrite field names."""
 
     model_config = ConfigDict(extra="ignore")
+    dropped_fields: list[str] = Field(default_factory=list, exclude=True)
+    _optional_numeric_fields: ClassVar[tuple[str, ...]] = ()
+
+    @model_validator(mode="before")
+    @classmethod
+    def record_dropped_fields(cls, values):
+        """Preserve names of present optional numeric fields that are discarded."""
+        if not isinstance(values, dict):
+            return values
+        dropped = list(values.get("dropped_fields", ()))
+        for field in cls._optional_numeric_fields:
+            if field in values:
+                value = values[field]
+                if value is None or isinstance(value, bool) or not isinstance(value, (int, float)) \
+                        or not math.isfinite(value):
+                    dropped.append(field)
+        if dropped:
+            values = dict(values)
+            values["dropped_fields"] = sorted(set(dropped))
+        return values
 
 
 class IspindelIngestRequest(_IngestBase):
     """Native iSpindel HTTP payload."""
 
+    _optional_numeric_fields = ("angle", "temperature", "battery", "battery_percent",
+                                "gravity", "RSSI")
+
     # The name carries the "[SG]" prefix convention that tells the service the gravity unit.
     name: Any = None
     ID: _Identifier = None
     token: Optional[str] = None
-    angle: Optional[IngestFloat] = None
-    temperature: Optional[IngestFloat] = None
+    angle: OptionalIngestFloat = None
+    temperature: OptionalIngestFloat = None
     temp_units: _TempUnit = "C"
-    battery: Optional[IngestFloat] = None
-    battery_percent: Optional[IngestFloat] = None
+    battery: OptionalIngestFloat = None
+    battery_percent: OptionalIngestFloat = None
     # A firmware or calibration fault can omit the gravity; the rest of the payload is
     # still stored so the gap stays visible instead of losing the reading.
-    gravity: Optional[IngestFloat] = None
+    gravity: OptionalIngestFloat = None
     interval: Any = None
-    RSSI: Optional[IngestFloat] = None
+    RSSI: OptionalIngestFloat = None
     color: Any = None
 
     @model_validator(mode="after")
@@ -86,27 +121,30 @@ class IspindelIngestRequest(_IngestBase):
 class GravityIngestRequest(_IngestBase):
     """Native GravityMon HTTP payload."""
 
+    _optional_numeric_fields = ("angle", "temperature", "battery", "battery_percent", "gravity",
+                                "velocity", "rssi", "RSSI", "run-time")
+
     name: Any = None
     # GravityMon's HTTP-push template names these keys "ID" and "RSSI" (the iSpindel
     # convention); the lowercase spellings are accepted too.
     id: _Identifier = Field(default=None, validation_alias=AliasChoices("id", "ID"))
     token: Optional[str] = None
-    angle: Optional[IngestFloat] = None
-    temperature: Optional[IngestFloat] = None
+    angle: OptionalIngestFloat = None
+    temperature: OptionalIngestFloat = None
     temp_units: _TempUnit = "C"
-    battery: Optional[IngestFloat] = None
-    battery_percent: Optional[IngestFloat] = None
+    battery: OptionalIngestFloat = None
+    battery_percent: OptionalIngestFloat = None
     # A firmware or calibration fault can omit the gravity (absent or null); the rest of
     # the payload is still stored with a null gravity.
-    gravity: Optional[IngestFloat] = None
+    gravity: OptionalIngestFloat = None
     corr_gravity: Any = Field(default=None, alias="corr-gravity")
     gravity_unit: _GravityUnit = Field(alias="gravity-unit")
-    velocity: Optional[IngestFloat] = None
+    velocity: OptionalIngestFloat = None
     interval: Any = None
-    rssi: Optional[IngestFloat] = Field(
+    rssi: OptionalIngestFloat = Field(
         default=None, validation_alias=AliasChoices("rssi", "RSSI")
     )
-    run_time: Optional[IngestFloat] = Field(default=None, alias="run-time")
+    run_time: OptionalIngestFloat = Field(default=None, alias="run-time")
 
     @model_validator(mode="after")
     def at_least_one_value(self) -> "GravityIngestRequest":
@@ -121,6 +159,9 @@ class GravityIngestRequest(_IngestBase):
 class PressureIngestRequest(_IngestBase):
     """Native PressureMon HTTP payload."""
 
+    _optional_numeric_fields = ("pressure", "pressure1", "pressure2", "temperature", "battery",
+                                "battery_percent", "rssi", "run-time")
+
     model_config = {"json_schema_extra": {"examples": [{
         "token": "example-device-token", "pressure1": 14.5, "pressure2": 29.0,
         "pressure_unit": "PSI", "temperature": 68.0, "temp_unit": "F",
@@ -131,11 +172,11 @@ class PressureIngestRequest(_IngestBase):
     token: Optional[str] = None
     # A sensor fault can omit the pressure (absent or null); the rest of the payload is
     # still stored with a null pressure.
-    pressure: Optional[IngestFloat] = Field(
+    pressure: OptionalIngestFloat = Field(
         default=None, validation_alias=AliasChoices("pressure", "pressure1"),
         description="First sensor: pressure or pressure1; pressure wins when both are present.",
     )
-    pressure2: Optional[IngestFloat] = None
+    pressure2: OptionalIngestFloat = None
     # PressureMon's HTTP-push templates name the unit keys "pressure-unit" /
     # "pressure_unit" and "temperature-unit" / "temp_unit"; "pressure_units" and
     # "temp_units" are the canonical names.
@@ -145,17 +186,17 @@ class PressureIngestRequest(_IngestBase):
         description=("kPa, bar or psi (case-insensitive); "
                      "pressure-unit and pressure_unit are aliases."),
     )
-    temperature: Optional[IngestFloat] = None
+    temperature: OptionalIngestFloat = None
     temp_units: _TempUnit = Field(
         default="C",
         validation_alias=AliasChoices("temp_units", "temperature-unit", "temp_unit"),
         description="C or F; temperature-unit and temp_unit are aliases.",
     )
-    battery: Optional[IngestFloat] = None
-    battery_percent: Optional[IngestFloat] = None
+    battery: OptionalIngestFloat = None
+    battery_percent: OptionalIngestFloat = None
     interval: Any = None
-    rssi: Optional[IngestFloat] = None
-    run_time: Optional[IngestFloat] = Field(default=None, alias="run-time")
+    rssi: OptionalIngestFloat = None
+    run_time: OptionalIngestFloat = Field(default=None, alias="run-time")
 
     @model_validator(mode="after")
     def at_least_one_value(self) -> "PressureIngestRequest":
@@ -170,10 +211,15 @@ class PressureIngestRequest(_IngestBase):
 class KegmonIngestRequest(_IngestBase):
     """KegMon absolute-volume event; ``pour`` distinguishes a pour event."""
 
+    _optional_numeric_fields = ("pour", "temperature")
+
     token: str = Field(min_length=1)
-    pour: Optional[IngestFloat] = None
+    pour: OptionalIngestFloat = None
     volume: IngestFloat
     maxVolume: IngestFloat
+    # Celsius. Never required and never a reason to refuse the event: an unusable value is
+    # dropped by the ingestion service, so it is not validated here.
+    temperature: OptionalIngestFloat = None
     event_id: Optional[str] = Field(default=None, alias="eventId", max_length=128)
 
 
@@ -195,25 +241,28 @@ class KegmonBeerResponse(BaseModel):
 class ChamberIngestRequest(_IngestBase):
     """Snake-case chamber-controller polling contract."""
 
+    _optional_numeric_fields = ("beer_temperature", "temperature", "fridge_temperature", "rssi",
+                                "battery", "battery_percent")
+
     token: Optional[str] = Field(default=None, min_length=1)
     id: _Identifier = None
     # "temperature" is the plain key a controller without a fridge probe sends, so the
     # dispatch endpoint's chamber detection (a temperature key without an angle) reads it.
-    beer_temperature: Optional[IngestFloat] = Field(
+    beer_temperature: OptionalIngestFloat = Field(
         default=None, validation_alias=AliasChoices("beer_temperature", "temperature")
     )
-    fridge_temperature: Optional[IngestFloat] = None
+    fridge_temperature: OptionalIngestFloat = None
     temp_units: _TempUnit = "C"
     # Accepted for compatibility and ignored: the server computes the returned mode and
     # setpoint entirely from batch state, so what a controller reports about itself never
     # influences the answer and never causes a rejection.
     current_mode: Any = None
     current_target: Any = None
-    rssi: Optional[IngestFloat] = None
+    rssi: OptionalIngestFloat = None
     # Mains-powered in practice today, but accepted for parity with the other
     # ingest contracts and any future battery-powered controller.
-    battery: Optional[IngestFloat] = None
-    battery_percent: Optional[IngestFloat] = None
+    battery: OptionalIngestFloat = None
+    battery_percent: OptionalIngestFloat = None
     # Both optional and independent of each other; a poll with neither keeps
     # working exactly as before (server date drives step-window matching).
     # local_timestamp: naive ISO 8601, e.g. "2026-08-26T14:32:00" — the
