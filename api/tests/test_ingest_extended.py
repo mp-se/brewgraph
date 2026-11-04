@@ -11,6 +11,7 @@
 import hashlib
 import json
 import uuid as _uuid
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 import pytest
@@ -31,6 +32,7 @@ from tests.conftest import DEVICE_DEFAULTS, truncate_database
 
 Device = resolve_model("Device")
 Tap = resolve_model("Tap")
+PourEvent = resolve_model("PourEvent")
 
 headers = {
     "Authorization": "Bearer " + get_settings().api_key.get_secret_value(),
@@ -823,8 +825,100 @@ def test_kegmon_non_finite_number_dropped(app_client, field, bad):
         assert r.status_code == 422
 
 
-def test_kegmon_event_id_longer_than_128_is_rejected(app_client):
-    """The idempotency key keeps its length limit."""
+def _pour_rows() -> list:
+    session = create_session()
+    try:
+        return [(p.event_id, p.tap_id) for p in session.query(PourEvent).all()]
+    finally:
+        session.close()
+
+
+def _logged_details() -> list:
+    session = create_session()
+    try:
+        return [row.error_detail for row in session.query(IngestionLog).all()]
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("bad", [12, True, ["a"], {"a": 1}, "", "   ", "x" * 129, "x" * 5000])
+def test_kegmon_unusable_event_id_is_dropped_logged_and_the_pour_stored(app_client, bad):
+    """A bad optional eventId never refuses the pour; it is stored without an id."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 19.5, "maxVolume": 20.0, "pour": 0.5, "eventId": bad}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert [p["pourAmount"] for p in _pours(app_client, vessel_id)] == [0.5]
+    assert [event_id for event_id, _ in _pour_rows()] == [None]
+    assert any("eventId" in detail for detail in _logged_details())
+
+
+def test_kegmon_null_event_id_is_absent(app_client):
+    """null is not a dropped value: nothing is logged."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 19.5, "maxVolume": 20.0, "pour": 0.5,
+            "eventId": None}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert len(_pours(app_client, vessel_id)) == 1
+    assert _logged_details() == []
+
+
+def test_kegmon_event_id_of_128_characters_is_stored(app_client):
+    """The length limit is inclusive."""
     tap, _ = _kegmon_setup(app_client)
-    body = {"token": tap["token"], "volume": 10.0, "maxVolume": 19.0, "eventId": "x" * 129}
-    assert app_client.post("/ingest/kegmon", json=body).status_code == 422
+    event_id = "x" * 128
+    body = {"token": tap["token"], "volume": 20.0, "maxVolume": 20.0, "pour": 0.5,
+            "eventId": event_id}
+    assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert [stored for stored, _ in _pour_rows()] == [event_id]
+    assert _logged_details() == []
+
+
+@pytest.mark.parametrize("bad", ["", "  ", "x" * 129])
+def test_kegmon_unusable_idempotency_header_is_dropped_and_logged(app_client, bad):
+    """An Idempotency-Key that cannot be an event id is dropped, named in the log."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 19.5, "maxVolume": 20.0, "pour": 0.5}
+    r = app_client.post("/ingest/kegmon", json=body, headers={"Idempotency-Key": bad})
+    assert r.status_code == 200
+    assert len(_pours(app_client, vessel_id)) == 1
+    assert [event_id for event_id, _ in _pour_rows()] == [None]
+    assert any("Idempotency-Key" in detail for detail in _logged_details())
+
+
+def test_kegmon_unusable_event_id_through_dispatch_is_logged(app_client):
+    """The dispatch endpoint records the dropped field as the dedicated one does."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 19.5, "maxVolume": 20.0, "pour": 0.5, "eventId": 7}
+    assert app_client.post("/ingest/dispatch", json=body).status_code == 200
+    assert len(_pours(app_client, vessel_id)) == 1
+    assert any("eventId" in detail for detail in _logged_details())
+
+
+def test_kegmon_same_event_id_on_two_taps_is_independent(app_client):
+    """The id is unique per tap, not globally."""
+    tap, _ = _kegmon_setup(app_client)
+    other = _create_tap_with_token(app_client, "kegmon-other-token")
+    batch_id = app_client.post("/batches", json={"name": "B2"}, headers=headers).json()["id"]
+    other_vessel = app_client.post("/vessels", json={
+        "batchId": batch_id, "vesselType": "keg", "name": "Keg2", "fillDate": "2026-05-01",
+        "totalVolume": 20.0, "volumeRemaining": 20.0, "status": "serving",
+    }, headers=headers).json()["id"]
+    app_client.patch(f"/vessels/{other_vessel}", json={"tapId": other["id"]}, headers=headers)
+    for token in (tap["token"], other["token"]):
+        body = {"token": token, "volume": 19.5, "maxVolume": 20.0, "pour": 0.5, "eventId": "same"}
+        assert app_client.post("/ingest/kegmon", json=body).status_code == 200
+    assert sorted(str(tap_id) for _, tap_id in _pour_rows()) == sorted([tap["id"], other["id"]])
+
+
+def test_kegmon_concurrent_duplicate_event_id_is_one_pour(app_client):
+    """Two identical requests at once leave one PourEvent row."""
+    tap, vessel_id = _kegmon_setup(app_client)
+    body = {"token": tap["token"], "volume": 19.5, "maxVolume": 20.0, "pour": 0.5,
+            "eventId": "race"}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(
+            lambda _: app_client.post("/ingest/kegmon", json=body).status_code, range(2)
+        ))
+    assert results == [200, 200]
+    assert len(_pour_rows()) == 1
+    assert _vessel(app_client, vessel_id)["volumeRemaining"] == 19.5

@@ -44,7 +44,8 @@ from oss.schemas.ingest import (
 from oss.services.ingestion import IngestionService
 
 from ._shared import (
-    IngestContext, _check_device_request_quota, _get_ingestion_service, router, with_url_token,
+    IngestContext, _check_device_request_quota, _get_ingestion_service, apply_idempotency_key,
+    router, with_url_token,
 )
 from .chamber import _process_chamber
 from .dispatch import _detect_device_type
@@ -116,7 +117,7 @@ async def ingest_kegmon(
     ctx = IngestContext(client_ip, background_tasks, ingestion_svc, auth, _throttle_budget)
     payload = body.model_dump(by_alias=True)
     payload["dropped_fields"] = body.dropped_fields
-    payload["eventId"] = payload.get("eventId") or request.headers.get("Idempotency-Key")
+    apply_idempotency_key(payload, request)
     return await _process_pour(payload, ctx)
 
 
@@ -289,7 +290,9 @@ async def ingest_dispatch(
     if schema_cls is None:
         raise HTTPException(status_code=422, detail="Cannot detect device type from payload fields")
     try:
-        payload = schema_cls.model_validate(raw).model_dump(by_alias=True)
+        validated = schema_cls.model_validate(raw)
+        payload = validated.model_dump(by_alias=True)
+        payload["dropped_fields"] = validated.dropped_fields
     except ValidationError as exc:
         logger.debug("Payload validation failed for device_type=%s: %s", device_type, exc)
         raise HTTPException(status_code=422, detail="Invalid payload structure") from exc
@@ -300,7 +303,7 @@ async def ingest_dispatch(
     if device_type == DeviceType.PRESSUREMON:
         return await _process_pressure(payload, ctx)
     if device_type == DeviceType.KEGMON:
-        payload["eventId"] = payload.get("eventId") or request.headers.get("Idempotency-Key")
+        apply_idempotency_key(payload, request)
         return await _process_pour(payload, ctx)
     return await _process_chamber(payload, ctx)
 

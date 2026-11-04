@@ -36,6 +36,7 @@ from core.db import get_session
 from core.enums import IngestionErrorReason
 from core.middleware.auth import AuthContext, enforce_request_rate_ceiling
 from core.models.registry import resolve_model
+from oss.schemas.ingest import is_event_id
 from oss.schemas.platform import IngestEndpointResponse
 from oss.services import TenantSettingsService, get_settings_service
 from oss.services.ingestion import IngestionService, UnstorableValueError
@@ -43,6 +44,19 @@ from oss.services.ingestion import IngestionService, UnstorableValueError
 TenantSettings = resolve_model("TenantSettings")  # type: ignore[assignment]
 
 _PARSE_ERROR_LOG_SECONDS = 15 * 60
+
+
+def apply_idempotency_key(payload: dict, request: Request) -> None:
+    """Use the Idempotency-Key header as the event id when the body carries none.
+
+    A header value that cannot be an event id is dropped and its name recorded."""
+    header_key = request.headers.get("Idempotency-Key")
+    if payload.get("eventId") or header_key is None:
+        return
+    if is_event_id(header_key):
+        payload["eventId"] = header_key
+    else:
+        payload["dropped_fields"] = [*payload.get("dropped_fields", ()), "Idempotency-Key"]
 
 
 def log_dropped_fields(ctx: "IngestContext", source: str, identity, fields: list[str]) -> None:

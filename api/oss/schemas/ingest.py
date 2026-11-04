@@ -208,6 +208,11 @@ class PressureIngestRequest(_IngestBase):
         return self
 
 
+def is_event_id(value) -> bool:
+    """Whether a KegMon event id fits the pour_event.event_id column and is not blank."""
+    return isinstance(value, str) and bool(value.strip()) and len(value) <= 128
+
+
 class KegmonIngestRequest(_IngestBase):
     """KegMon absolute-volume event; ``pour`` distinguishes a pour event."""
 
@@ -221,6 +226,20 @@ class KegmonIngestRequest(_IngestBase):
     # dropped by the ingestion service, so it is not validated here.
     temperature: OptionalIngestFloat = None
     event_id: Optional[str] = Field(default=None, alias="eventId", max_length=128)
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_unusable_event_id(cls, values):
+        """Drop an event id that is not a non-blank string of at most 128 characters."""
+        if not isinstance(values, dict):
+            return values
+        bad = [k for k in ("eventId", "event_id")
+               if k in values and values[k] is not None and not is_event_id(values[k])]
+        if not bad:
+            return values
+        values = {k: v for k, v in values.items() if k not in bad}
+        values["dropped_fields"] = sorted({*values.get("dropped_fields", ()), "eventId"})
+        return values
 
 
 class KegmonBeerRequest(_IngestBase):
