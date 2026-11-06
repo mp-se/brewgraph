@@ -30,7 +30,7 @@ def _add_public_fixture(*, deleted_batch: bool = False) -> None:
     try:
         settings = TenantSettings(
             brewery_name="Sunset Brewing",
-            logo_url="https://example.com/logo.png",
+            tap_list_logo="hop",
             theme="chalkboard",
             primary_color="#f59e0b",
         )
@@ -174,10 +174,27 @@ def test_public_context_is_unauthenticated_and_only_exposes_presentation(root_cl
     assert response.headers["cache-control"] == "public, max-age=300"
     assert response.json() == {
         "breweryName": "Sunset Brewing",
-        "logoUrl": "https://example.com/logo.png",
+        "logoUrl": "/logos/hop.svg",
         "theme": "chalkboard",
         "primaryColor": "#f59e0b",
     }
+
+
+def test_public_context_logo_url_is_null_without_a_logo(root_client):
+    """No chosen logo means a null logoUrl, never an empty or placeholder path."""
+    test_init()
+    db = create_session()
+    try:
+        db.add(TenantSettings(brewery_name="Sunset Brewing", tap_list_logo=None))
+        db.commit()
+    finally:
+        db.close()
+    with patch("oss.routers.public_display.read_key", return_value=None), \
+         patch("oss.routers.public_display.write_key", return_value=True):
+        response = root_client.get("/d")
+
+    assert response.status_code == 200
+    assert response.json()["logoUrl"] is None
 
 
 def test_public_taps_return_sanitized_current_keg_snapshots(root_client):

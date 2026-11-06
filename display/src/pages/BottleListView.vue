@@ -13,7 +13,8 @@
   <div :class="['public-display', `theme-${context?.theme ?? 'dark'}`, { 'tv-mode': tvMode }]"
        :style="cssVars">
     <header class="display-header">
-      <img v-if="context?.logoUrl" :src="context.logoUrl" alt="Venue logo" class="display-logo" />
+      <span v-if="context?.logoUrl" role="img" aria-label="Venue logo" class="display-logo"
+            :style="{ '--display-logo-url': `url(${context.logoUrl})` }" />
       <div><h1>{{ context?.breweryName ?? 'Bottle Menu' }}</h1><p>Packaged beer</p></div>
       <a :href="tapRoute" class="display-link">Tap list</a>
     </header>
@@ -27,8 +28,8 @@
         <p v-if="bottle.style" class="muted">{{ bottle.style }}</p>
         <p class="stats">
           <span v-if="bottle.abv != null">{{ bottle.abv.toFixed(1) }}% ABV</span>
-          <span v-if="bottle.ibu != null"> · {{ Math.round(bottle.ibu) }} IBU</span>
-          <span v-if="bottle.ebc != null"> · <i class="swatch" :style="{ background: ebcToHex(bottle.ebc) }" />{{ Math.round(bottle.ebc) }} EBC</span>
+          <span v-if="bottle.ibu != null"><template v-if="bottle.abv != null"> · </template>{{ Math.round(bottle.ibu) }} IBU</span>
+          <span v-if="bottle.ebc != null"><template v-if="bottle.abv != null || bottle.ibu != null"> · </template><i class="swatch" :style="{ background: ebcToHex(bottle.ebc) }" />{{ Math.round(bottle.ebc) }} EBC</span>
         </p>
         <p class="bottle-volume">{{ bottle.bottleVolume.toFixed(2) }} L bottles</p>
       </article>

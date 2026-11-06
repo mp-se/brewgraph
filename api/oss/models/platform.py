@@ -47,7 +47,8 @@ class TenantSettings(Base):
     # They are deliberately not an enablement control: a self-hosted instance
     # decides reachability at its reverse proxy or network boundary.
     brewery_name = mapped_column(String(100), nullable=True, default=None)
-    logo_url = mapped_column(String(2048), nullable=True, default=None)
+    # One of the fixed logo keys (oss.schemas.platform.TAP_LIST_LOGOS), or NULL for none.
+    tap_list_logo = mapped_column(String(20), nullable=True, default=None)
     theme = mapped_column(String(20), nullable=False, default="dark")
     primary_color = mapped_column(String(7), nullable=True, default=None)
     updated_at = mapped_column(

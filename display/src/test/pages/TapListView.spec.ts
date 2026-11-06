@@ -62,6 +62,26 @@ describe('TapListView', () => {
     expect(wrapper.text()).not.toContain('servingVesselId');
   });
 
+  it('shows no leading separator when ABV is missing', async () => {
+    mockedAxios.get.mockImplementation((url: string) => Promise.resolve({
+      data: url === '/d'
+        ? { breweryName: 'B', logoUrl: null, theme: 'dark', primaryColor: null }
+        : [{
+          tapName: 'Tap 1', beerName: 'Ale', ibu: 39, ebc: 45,
+          serving: {
+            servingSince: '2026-09-13T10:30:00Z', totalVolume: 19,
+            volumeRemaining: 5, volumePoured: 14, temperature: null,
+            temperatureAt: null, pressure: null, pressureAt: null, lastPour: null,
+          },
+        }],
+    }));
+    const wrapper = mount(TapListView);
+    await flushPromises();
+
+    expect(wrapper.find('.stats').text()).toBe('39 IBU · 45 EBC');
+    wrapper.unmount();
+  });
+
   const calls = (url: string) => mockedAxios.get.mock.calls.filter(([u]) => u === url).length;
 
   it('polls taps every minute and the display context every five', async () => {

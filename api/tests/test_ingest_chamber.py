@@ -193,12 +193,7 @@ def _temp_rows(**filters):
 
 
 def test_chamber_writes_both_beer_and_fridge_temps(app_client):
-    """Both beer-temp and fridge-temp are stored, tagged beer and chamber.
-
-    Previously write_temp collapsed them with `temperature if not None else fridge_temp`
-    and wrote a single row, so the chamber reading was discarded whenever a beer reading
-    was also present.
-    """
+    """Both temperatures are stored, the beer one as `beer` and the fridge one as `chamber`."""
     truncate_database()
     device = _create_device(app_client, "CHMB01", "gravitymon")
     batch = app_client.post("/batches", json={"name": "Ambient B"}, headers=headers).json()
@@ -280,7 +275,7 @@ def test_chamber_battery_percent_is_stored_without_conversion(app_client):
 
 
 def test_chamber_fridge_only_is_tagged_chamber_not_beer(app_client):
-    """A lone fridge-temp is stored as `chamber`, not mislabelled `beer`."""
+    """A lone fridge-temp is stored as `chamber` only, with no beer row."""
     truncate_database()
     device = _create_device(app_client, "CHMB02", "gravitymon")
     batch = app_client.post("/batches", json={"name": "Fridge only"}, headers=headers).json()
@@ -295,6 +290,22 @@ def test_chamber_fridge_only_is_tagged_chamber_not_beer(app_client):
     assert len(rows) == 1
     assert rows[0].temp_type == "chamber"
     assert rows[0].temperature == 3.5
+
+
+def test_chamber_beer_only_stores_only_a_beer_row(app_client):
+    """A lone beer temperature is stored as `beer` only, with no chamber row."""
+    truncate_database()
+    device = _create_device(app_client, "CHMB04", "gravitymon")
+    batch = app_client.post("/batches", json={"name": "Beer only"}, headers=headers).json()
+    _assign_device_to_batch(app_client, device["id"], batch["id"])
+
+    r = app_client.post("/ingest/chamber", json={
+        "current_mode": "R", "token": device["token"], "beer_temperature": 18.5, "temp_units": "C",
+    })
+    assert r.status_code == 200
+
+    rows = _temp_rows(batch_id=batch["id"])
+    assert [(x.temp_type, x.temperature) for x in rows] == [("beer", 18.5)]
 
 
 def test_vessel_without_batch_still_records(app_client):
@@ -331,6 +342,69 @@ def test_vessel_without_batch_still_records(app_client):
     assert len(rows) == 1, "storage temp for a batchless keg must be recorded, not dropped"
     assert rows[0].batch_id is None
     assert rows[0].temperature == 5.5
+
+
+def _keg_with_batch(app_client, chip_id: str, batch_name: str):
+    """A chamber device linked to a keg that holds a batch."""
+    device = _create_device(app_client, chip_id, "gravitymon")
+    batch = app_client.post("/batches", json={"name": batch_name}, headers=headers).json()
+    vessel = app_client.post("/vessels", json={
+        "batchId": batch["id"], "vesselNumber": 1, "vesselType": "keg", "name": "Keg",
+        "fillDate": "2026-05-01", "totalVolume": 19.0, "volumeRemaining": 19.0,
+        "status": "filled",
+    }, headers=headers).json()
+    assert app_client.patch(
+        f"/devices/{device['id']}", json={"vesselId": vessel["id"]}, headers=headers
+    ).status_code == 200
+    return device, batch, vessel
+
+
+def test_vessel_with_batch_records_vessel_only(app_client):
+    """A probe on a keg holding a batch stores beer and fridge rows with the vessel only."""
+    truncate_database()
+    device, _, vessel = _keg_with_batch(app_client, "CHMV01", "Kegged beer")
+
+    r = app_client.post("/ingest/chamber", json={
+        "current_mode": "R", "token": device["token"],
+        "beer_temperature": 5.5, "fridge_temperature": 3.0, "temp_units": "C",
+    })
+    assert r.status_code == 200
+
+    rows = _temp_rows(vessel_id=vessel["id"])
+    assert [(x.temp_type, str(x.vessel_id), x.batch_id) for x in rows] == [
+        ("beer", vessel["id"], None), ("chamber", vessel["id"], None),
+    ]
+
+
+def test_vessel_with_batch_refusing_ingest_is_suppressed(app_client):
+    """A keg's batch with accept_ingest false suppresses the write, still answering 200."""
+    truncate_database()
+    device, batch, vessel = _keg_with_batch(app_client, "CHMV02", "Refusing beer")
+    assert app_client.patch(
+        f"/batches/{batch['id']}", json={"acceptIngest": False}, headers=headers
+    ).status_code == 200
+
+    r = app_client.post("/ingest/chamber", json={
+        "current_mode": "R", "token": device["token"], "beer_temperature": 5.5, "temp_units": "C",
+    })
+    assert r.status_code == 200
+    assert not _temp_rows(vessel_id=vessel["id"])
+
+
+def test_batch_linked_device_records_batch_only(app_client):
+    """A device linked directly to a batch keeps batch_id and no vessel."""
+    truncate_database()
+    device = _create_device(app_client, "CHMV03", "gravitymon")
+    batch = app_client.post("/batches", json={"name": "Direct"}, headers=headers).json()
+    _assign_device_to_batch(app_client, device["id"], batch["id"])
+
+    r = app_client.post("/ingest/chamber", json={
+        "current_mode": "R", "token": device["token"], "beer_temperature": 18.5, "temp_units": "C",
+    })
+    assert r.status_code == 200
+    rows = _temp_rows(batch_id=batch["id"])
+    assert len(rows) == 1
+    assert rows[0].vessel_id is None
 
 
 def test_chamber_fahrenheit_conversion(app_client):
@@ -769,10 +843,24 @@ def test_chamber_unknown_temp_unit_rejected(app_client, unit):
     assert r.status_code == 422
 
 
-def test_dispatch_reads_a_plain_temperature_key_as_the_beer_temperature(app_client):
-    """The dispatch endpoint detects a chamber payload from a bare `temperature` key."""
+def test_dispatch_does_not_detect_a_bare_temperature_key_as_a_chamber(app_client):
+    """A payload with only `temperature` is not a chamber on the dispatch endpoint."""
     device, batch = _chamber_batch(app_client, "CHMR07")
     r = app_client.post("/ingest/dispatch", json={"token": device["token"], "temperature": 19.5})
-    assert r.status_code == 200
-    rows = _temp_rows(batch_id=batch["id"])
-    assert [(x.temp_type, x.temperature) for x in rows] == [("beer", 19.5)]
+    assert r.status_code == 422
+    assert not _temp_rows(batch_id=batch["id"])
+
+
+def test_chamber_endpoint_rejects_a_bare_temperature_key(app_client):
+    """The chamber endpoint accepts only beer_temperature and fridge_temperature: 422."""
+    device, batch = _chamber_batch(app_client, "CHMR08")
+    r = app_client.post("/ingest/chamber", json={"token": device["token"], "temperature": 19.5})
+    assert r.status_code == 422
+    assert not _temp_rows(batch_id=batch["id"])
+
+
+def test_chamber_requires_beer_or_fridge_temperature(app_client):
+    """A chamber poll with neither temperature is rejected with 422."""
+    device, _ = _chamber_batch(app_client, "CHMR09")
+    r = app_client.post("/ingest/chamber", json={"token": device["token"]})
+    assert r.status_code == 422

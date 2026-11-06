@@ -73,6 +73,13 @@ class _PourIngestionMixin:
             created_at=datetime.now(UTC),
         ))
 
+    def _active_vessel_with_batch(self, tap: Tap) -> StorageVessel:
+        """The tap's active vessel; a vessel with no batch is ignored like no vessel."""
+        vessel = self.find_active_vessel_for_tap(tap)
+        if vessel is None or vessel.batch_id is None:
+            raise NoActiveVesselError(f"No active vessel with a batch on tap id={tap.id}")
+        return vessel
+
     def write_pour(self, tap: Tap, payload: dict) -> Optional[PourEvent]:
         """Apply an authoritative KegMon volume update and optionally record its pour."""
         event_id = payload.get("eventId") or payload.get("event_id")
@@ -82,9 +89,7 @@ class _PourIngestionMixin:
             ).first()
             if existing is not None:
                 return existing
-        vessel = self.find_active_vessel_for_tap(tap)
-        if vessel is None:
-            raise NoActiveVesselError(f"No active vessel on tap id={tap.id}")
+        vessel = self._active_vessel_with_batch(tap)
         previous = vessel.volume_remaining
         volume, max_volume = self._vessel_levels(payload)
         pour_reported = payload.get("pour") is not None

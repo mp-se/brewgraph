@@ -10,7 +10,7 @@
 """Platform Pydantic schemas (TenantSettings, SystemLog, IngestionLog)."""
 import uuid
 from datetime import datetime
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,6 +21,11 @@ from oss.schemas._camel import to_camel
 # ---------------------------------------------------------------------------
 # TenantSettings
 # ---------------------------------------------------------------------------
+
+# The fixed set of tap list logos; each key has display/public/logos/<key>.svg.
+TapListLogo = Literal["hop", "barley", "barrel", "kettle", "bottle", "glass", "tap", "yeast"]
+TAP_LIST_LOGOS = get_args(TapListLogo)
+
 
 class TenantSettingsBase(BaseModel):
     """Fields shared by all TenantSettings schemas."""
@@ -35,7 +40,7 @@ class TenantSettingsBase(BaseModel):
     pressure_format: PressureFormat = PressureFormat.KPA
     volume_format: VolumeFormat = VolumeFormat.METRIC
     brewery_name: Optional[str] = Field(default=None, max_length=100)
-    logo_url: Optional[str] = Field(default=None, max_length=2048)
+    tap_list_logo: Optional[TapListLogo] = None
     theme: Literal["dark", "light", "chalkboard", "minimal"] = "dark"
     primary_color: Optional[str] = Field(
         default=None,

@@ -390,6 +390,34 @@ def test_kegmon_no_active_vessel_is_ignored(app_client, extra):
     assert _count_rows(IngestionLog) == 0
 
 
+@pytest.mark.parametrize("extra", [{"pour": 0.5, "eventId": "nb1"}, {}])
+def test_kegmon_vessel_without_batch_is_ignored(app_client, extra):
+    """A pour or level for a vessel holding no batch answers 200 and stores nothing."""
+    truncate_database()
+    tap = _create_tap_with_token(app_client, "kegmon-nobatch-tok")
+    vessel_id = app_client.post("/vessels", json={
+        "vesselType": "keg", "name": "Empty keg", "fillDate": "2026-05-01",
+        "totalVolume": 20.0, "volumeRemaining": 20.0, "status": "serving",
+    }, headers=headers).json()["id"]
+    app_client.patch(f"/vessels/{vessel_id}", json={"tapId": tap["id"]}, headers=headers)
+    r = app_client.post(
+        "/ingest/kegmon",
+        json={"volume": 10.0, "maxVolume": 19.0, "temperature": 20.0, "token": tap["token"],
+              **extra},
+    )
+    assert r.status_code == 200
+    assert r.text == ""
+    assert _count_rows(resolve_model("PourEvent")) == 0
+    assert _count_rows(resolve_model("TempReading")) == 0
+    assert _count_rows(IngestionLog) == 0
+    assert _vessel(app_client, vessel_id)["volumeRemaining"] == 20.0
+    session = create_session()
+    try:
+        assert session.get(resolve_model("Tap"), _uuid.UUID(tap["id"])).last_seen is not None
+    finally:
+        session.close()
+
+
 def _temps(vessel_id) -> list:
     session = create_session()
     try:

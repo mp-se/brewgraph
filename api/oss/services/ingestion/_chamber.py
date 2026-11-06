@@ -63,11 +63,9 @@ class _ChamberIngestionMixin:
     ) -> Optional[Device]:
         """Write TempReading row(s) resolved via device token or chamber chip ID.
 
-        **One row per value present**, not one row total: a chamber controller reporting
-        both ``beer-temp`` and ``fridge-temp`` produces two readings, tagged `beer` and
-        `chamber`. ``temp_type`` labels ``temperature`` and defaults to `beer` — a plain
-        ambient probe overrides it. ``fridge_temp`` is always `chamber`, since only a
-        chamber controller has one.
+        **One row per value present**, with no fallback from one to the other:
+        ``temperature`` (the beer probe) is stored with ``temp_type`` (default `beer`)
+        and ``fridge_temp`` is always stored as `chamber`.
 
         Identity resolves through ``resolve_device``, so a ``chamber_controller`` may be
         matched by its configured chip ID when no valid token is supplied — the same
@@ -119,7 +117,8 @@ class _ChamberIngestionMixin:
                 continue
             self._temp_svc.create(TempReadingIngest(
                 vessel_id=device.vessel_id,
-                batch_id=batch_id,
+                # A vessel-linked reading carries the vessel only: the table forbids both.
+                batch_id=batch_id if device.vessel_id is None else None,
                 device_id=device.id,
                 temperature=value,
                 battery=battery,

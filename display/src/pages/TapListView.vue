@@ -13,7 +13,8 @@
   <div :class="['public-display', `theme-${context?.theme ?? 'dark'}`, { 'tv-mode': tvMode }]"
        :style="cssVars">
     <header class="display-header">
-      <img v-if="context?.logoUrl" :src="context.logoUrl" alt="Venue logo" class="display-logo" />
+      <span v-if="context?.logoUrl" role="img" aria-label="Venue logo" class="display-logo"
+            :style="{ '--display-logo-url': `url(${context.logoUrl})` }" />
       <div>
         <h1>{{ context?.breweryName ?? 'Tap List' }}</h1>
         <p>Live · {{ today }}</p>
@@ -39,8 +40,8 @@
             <p v-if="tap.style" class="muted">{{ tap.style }}</p>
             <p class="stats">
               <span v-if="tap.abv != null">{{ tap.abv.toFixed(1) }}% ABV</span>
-              <span v-if="tap.ibu != null"> · {{ Math.round(tap.ibu) }} IBU</span>
-              <span v-if="tap.ebc != null"> · <i class="swatch" :style="{ background: ebcToHex(tap.ebc) }" />{{ Math.round(tap.ebc) }} EBC</span>
+              <span v-if="tap.ibu != null"><template v-if="tap.abv != null"> · </template>{{ Math.round(tap.ibu) }} IBU</span>
+              <span v-if="tap.ebc != null"><template v-if="tap.abv != null || tap.ibu != null"> · </template><i class="swatch" :style="{ background: ebcToHex(tap.ebc) }" />{{ Math.round(tap.ebc) }} EBC</span>
             </p>
             <div class="bar-track"><div class="bar-fill" :style="{ width: `${fillPercent(tap.serving)}%` }" /></div>
             <dl class="serving-readings">

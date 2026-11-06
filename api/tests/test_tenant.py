@@ -48,7 +48,7 @@ def test_update_tenant_settings_includes_public_display_presentation(app_client)
         "/tenant/settings",
         json={
             "breweryName": "Sunset Brewing",
-            "logoUrl": "https://example.com/logo.png",
+            "tapListLogo": "barrel",
             "theme": "minimal",
             "primaryColor": "#f59e0b",
         },
@@ -57,9 +57,28 @@ def test_update_tenant_settings_includes_public_display_presentation(app_client)
     assert r.status_code == 200
     data = r.json()
     assert data["breweryName"] == "Sunset Brewing"
-    assert data["logoUrl"] == "https://example.com/logo.png"
+    assert data["tapListLogo"] == "barrel"
     assert data["theme"] == "minimal"
     assert data["primaryColor"] == "#f59e0b"
+
+
+def test_tap_list_logo_rejects_unknown_key_and_null_clears(app_client):
+    """Only the fixed keys are accepted; null removes the logo."""
+    bad = app_client.patch("/tenant/settings", json={"tapListLogo": "dragon"}, headers=headers)
+    assert bad.status_code == 422
+    assert bad.json()["error"] == "validation_error"
+
+    url = app_client.patch(
+        "/tenant/settings", json={"tapListLogo": "https://example.com/x.png"}, headers=headers
+    )
+    assert url.status_code == 422
+
+    ok = app_client.patch("/tenant/settings", json={"tapListLogo": "yeast"}, headers=headers)
+    assert ok.json()["tapListLogo"] == "yeast"
+    cleared = app_client.patch("/tenant/settings", json={"tapListLogo": None}, headers=headers)
+    assert cleared.status_code == 200
+    assert cleared.json()["tapListLogo"] is None
+    assert app_client.get("/tenant/settings", headers=headers).json()["tapListLogo"] is None
 
 
 def test_update_tenant_settings_ignores_precision(app_client):

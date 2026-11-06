@@ -223,6 +223,35 @@ describe('useConfigStore', () => {
       )
     })
 
+    it('should send the chosen tap list logo, and null to clear it', async () => {
+      const store = useConfigStore()
+      store.temperatureFormat = 'C'
+      store.pressureFormat = 'BAR'
+      store.gravityFormat = 'SG'
+      store.volumeFormat = 'metric'
+      const sentBody = () => JSON.parse(global.fetch.mock.calls.at(-1)[1].body)
+
+      global.fetch = vi.fn().mockResolvedValue({ status: 200 })
+      store.tapListLogo = 'hop'
+      await store.save()
+      expect(sentBody().tapListLogo).toBe('hop')
+
+      store.tapListLogo = null
+      await store.save()
+      expect(sentBody()).toHaveProperty('tapListLogo', null)
+    })
+
+    it('should load the tap list logo, null when absent', async () => {
+      const store = useConfigStore()
+      const base = { temperatureFormat: 'c', pressureFormat: 'bar', gravityFormat: 'sg', volumeFormat: 'metric' }
+      global.fetch = vi.fn().mockResolvedValueOnce({ json: async () => ({ ...base, tapListLogo: 'kettle' }) })
+      await store.load()
+      expect(store.tapListLogo).toBe('kettle')
+      global.fetch = vi.fn().mockResolvedValueOnce({ json: async () => ({ ...base, tapListLogo: null }) })
+      await store.load()
+      expect(store.tapListLogo).toBeNull()
+    })
+
     it('should handle non-200 response status', async () => {
       const store = useConfigStore()
 

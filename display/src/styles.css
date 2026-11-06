@@ -89,7 +89,18 @@ body { margin: 0; }
 .display-header h1, .display-header p { margin: 0; }
 .display-header h1 { font-size: 1.5rem; font-weight: 500; }
 .display-header p { color: var(--display-header-sub); }
-.display-logo { max-width: 160px; max-height: 48px; object-fit: contain; }
+/* A mask, not an <img>: the symbol is painted in the header text colour, so it follows
+   the theme and accent colour. */
+.display-logo {
+  display: inline-block;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  background-color: currentColor;
+  color: var(--display-header-text);
+  -webkit-mask: var(--display-logo-url) center/contain no-repeat;
+  mask: var(--display-logo-url) center/contain no-repeat;
+}
 .display-link {
   margin-left: auto;
   padding: 4px 12px;

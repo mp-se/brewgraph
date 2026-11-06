@@ -36,6 +36,4 @@ def _detect_device_type(payload: dict) -> Optional[DeviceType]:
     for field, device_type in field_map:
         if field in payload:
             return device_type
-    if "temperature" in payload and "angle" not in payload:
-        return DeviceType.CHAMBER_CONTROLLER
     return None

@@ -105,6 +105,9 @@
           />
           </div>
         </div>
+        <div class="col-md-12">
+          <TapListLogoPicker v-model="config.tapListLogo" :disabled="global.disabled" />
+        </div>
         <!-- 
         <div class="col-md-6">
           <AppInputNumber
@@ -152,6 +155,7 @@ import { global, config, preferences } from '@/modules/pinia'
 import { validateCurrentForm } from '@/modules/utils'
 import { logDebug } from '@/ui'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import TapListLogoPicker from '@/components/TapListLogoPicker.vue'
 import {
   temperatureOptions,
   gravityOptions,

@@ -33,6 +33,8 @@ export default defineConfig({
       '/events': devProxy,
       '/health': devProxy,
       '/ingest': devProxy,
+      '/public': devProxy,
+      '/logos': devProxy,
       '/env-config.js': devProxy
     }
   },

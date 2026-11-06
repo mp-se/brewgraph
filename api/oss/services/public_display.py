@@ -34,7 +34,7 @@ class PublicDisplayContext:
 
     scope_id: object | None
     brewery_name: Optional[str]
-    logo_url: Optional[str]
+    tap_list_logo: Optional[str]
     theme: str
     primary_color: Optional[str]
 
@@ -64,14 +64,14 @@ class PublicDisplayService:
             return PublicDisplayContext(
                 scope_id=None,
                 brewery_name=get_settings().app_name,
-                logo_url=None,
+                tap_list_logo=None,
                 theme="dark",
                 primary_color=None,
             )
         return PublicDisplayContext(
             scope_id=None,
             brewery_name=settings.brewery_name,
-            logo_url=settings.logo_url,
+            tap_list_logo=settings.tap_list_logo,
             theme=settings.theme,
             primary_color=settings.primary_color,
         )
@@ -81,7 +81,9 @@ class PublicDisplayService:
         """Serialize only presentation fields that belong on an anonymous screen."""
         return PublicDisplayContextResponse(
             brewery_name=context.brewery_name,
-            logo_url=context.logo_url,
+            logo_url=(
+                f"/logos/{context.tap_list_logo}.svg" if context.tap_list_logo else None
+            ),
             theme=context.theme,
             primary_color=context.primary_color,
         )
@@ -138,7 +140,7 @@ class PublicDisplayService:
             # a device or operator timestamp.
             serving_since=datetime.combine(vessel.fill_date, time.min, tzinfo=UTC),
             total_volume=vessel.total_volume,
-            volume_remaining=vessel.volume_remaining,
+            volume_remaining=max(0.0, vessel.volume_remaining),
             volume_poured=max(0.0, vessel.total_volume - vessel.volume_remaining),
             temperature=temperature.temperature if temperature is not None else None,
             temperature_at=temperature.created_at if temperature is not None else None,
@@ -148,7 +150,7 @@ class PublicDisplayService:
                 PublicLastPour(
                     at=pour.created_at,
                     amount=pour.pour_amount,
-                    volume_remaining=pour.volume_remaining,
+                    volume_remaining=max(0.0, pour.volume_remaining),
                 )
                 if pour is not None
                 else None

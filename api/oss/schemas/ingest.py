@@ -260,16 +260,12 @@ class KegmonBeerResponse(BaseModel):
 class ChamberIngestRequest(_IngestBase):
     """Snake-case chamber-controller polling contract."""
 
-    _optional_numeric_fields = ("beer_temperature", "temperature", "fridge_temperature", "rssi",
+    _optional_numeric_fields = ("beer_temperature", "fridge_temperature", "rssi",
                                 "battery", "battery_percent")
 
     token: Optional[str] = Field(default=None, min_length=1)
     id: _Identifier = None
-    # "temperature" is the plain key a controller without a fridge probe sends, so the
-    # dispatch endpoint's chamber detection (a temperature key without an angle) reads it.
-    beer_temperature: OptionalIngestFloat = Field(
-        default=None, validation_alias=AliasChoices("beer_temperature", "temperature")
-    )
+    beer_temperature: OptionalIngestFloat = None
     fridge_temperature: OptionalIngestFloat = None
     temp_units: _TempUnit = "C"
     # Accepted for compatibility and ignored: the server computes the returned mode and

@@ -21,6 +21,8 @@ export const useConfigStore = defineStore('config', {
     pressureFormat: '',
     gravityFormat: '',
     volumeFormat: '',
+    // One of the fixed tap list logo keys, or null for no logo.
+    tapListLogo: null as string | null,
     // Read-only decimal-precision metadata sourced from GET /tenant/settings'
     // `precision` field (api/oss/precision.py DECIMALS) -- never PATCHed back.
     precision: {} as Record<string, number>
@@ -76,6 +78,7 @@ export const useConfigStore = defineStore('config', {
         this.pressureFormat = (json.pressureFormat as string).toUpperCase()
         this.gravityFormat = (json.gravityFormat as string).toUpperCase()
         this.volumeFormat = volumeMap[(json.volumeFormat as string).toLowerCase()] ?? json.volumeFormat
+        this.tapListLogo = (json.tapListLogo as string | null) ?? null
         saveConfigState()
         return true
       } catch (err) {
@@ -95,7 +98,8 @@ export const useConfigStore = defineStore('config', {
           temperatureFormat: this.temperatureFormat.toLowerCase(),
           pressureFormat: this.pressureFormat.toLowerCase(),
           gravityFormat: this.gravityFormat.toLowerCase(),
-          volumeFormat: this.volumeFormat.toLowerCase()
+          volumeFormat: this.volumeFormat.toLowerCase(),
+          tapListLogo: this.tapListLogo
         },
         { okStatuses: [200] }
       )
