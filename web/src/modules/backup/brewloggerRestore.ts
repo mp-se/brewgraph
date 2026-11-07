@@ -239,10 +239,11 @@ export function mapBrewLoggerToBrewGraph(source: BrewLoggerBackup): ExportDocume
     const vessel = vessels.find((v) => v.id === `vessel_batch_${b.id}`)
     if (!vessel) continue
     const tapId = `tap_batch_${b.id}`
+    const number = tapNumber++
     taps.push({
       id: tapId,
-      name: b.name ?? String(b.id),
-      tapNumber: tapNumber++,
+      name: `Tap ${number}`,
+      tapNumber: number,
       location: '',
       notes: 'Auto-created from BrewLogger import'
     })

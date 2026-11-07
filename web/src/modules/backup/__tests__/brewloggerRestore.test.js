@@ -517,6 +517,24 @@ describe('mapBrewLoggerToBrewGraph', () => {
     expect(result.taps[1].tapNumber).toBe(2)
   })
 
+  it('names auto-created taps "Tap <number>" regardless of batch name', () => {
+    const mkPour = (id) => [
+      {
+        id,
+        pour: 0.5,
+        volume: 18.5,
+        maxVolume: 19,
+        created: '2026-01-01T10:00:00',
+        active: true
+      }
+    ]
+    const batch1 = { ...makeBatch({ id: 1, tapList: true, pour: mkPour(1) }), name: 'Old IPA' }
+    const batch2 = { ...makeBatch({ id: 2, tapList: true, pour: mkPour(2) }), name: undefined }
+    const result = mapBrewLoggerToBrewGraph(makeFullBackup({ batches: [batch1, batch2] }))
+    expect(result.taps.map((t) => t.name)).toEqual(['Tap 1', 'Tap 2'])
+    expect(result.taps.map((t) => t.tapNumber)).toEqual([1, 2])
+  })
+
   it('skips device with no chipId from chip map', () => {
     const device = makeDevice({ chipId: undefined })
     const batch = makeBatch({ chipIdGravity: null, chipIdPressure: null })
