@@ -10,7 +10,7 @@
  */
 
 import { logInfo, logDebug } from '@/ui'
-import { VESSEL_STATUS_CLEAN, VESSEL_STATUS_SERVING } from '@/modules/classes'
+import { VESSEL_STATUS_SERVING } from '@/modules/classes'
 import { buildExportDocument } from './exportDocument'
 import type { ExportDocument, SourceBatch, SourceDevice } from './exportDocument'
 import type {
@@ -155,14 +155,16 @@ export function mapBrewLoggerBatchToVessel(b: BrewLoggerBatchRecord): BrewGraphV
     tapId: null,
     vesselNumber: null,
     vesselType: 'keg',
-    name: `${b.name ?? batchId} Keg`,
+    // A keg is reused between batches, so the beer name does not belong in it.
+    name: 'Keg',
     fillDate,
     totalVolume,
     volumeRemaining,
     bottleVolume: null,
     bottleCount: null,
     bottlesRemaining: null,
-    status: volumeRemaining > 0 ? VESSEL_STATUS_SERVING : VESSEL_STATUS_CLEAN,
+    // A keg that ran dry is serving and empty, not clean: it keeps its batch.
+    status: VESSEL_STATUS_SERVING,
     location: '',
     notes: 'Auto-created from BrewLogger import',
     pourEvents

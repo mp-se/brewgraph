@@ -9,6 +9,8 @@
  * See LICENSE for details.
  */
 
+import { VESSEL_STATUS_CLEAN } from '@/core/settings/formats'
+
 interface StorageVesselParams {
   id?: string
   batchId?: string
@@ -159,9 +161,12 @@ export class StorageVessel {
   }
 
   toJson(): Record<string, unknown> {
+    // A clean vessel is unassigned; the server refuses one sent with a batch or tap and
+    // zeroes its remaining figures itself.
+    const clean = this.status === VESSEL_STATUS_CLEAN
     return {
-      batchId: this.batchId || null,
-      tapId: this.tapId,
+      batchId: clean ? null : this.batchId || null,
+      tapId: clean ? null : this.tapId,
       vesselNumber: this.vesselNumber,
       vesselType: this.vesselType,
       name: this.name,

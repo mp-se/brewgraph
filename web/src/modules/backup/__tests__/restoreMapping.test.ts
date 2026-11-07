@@ -182,6 +182,30 @@ describe('backup restore mapping', () => {
         new Map([['t-old', 't-new']])
       )
     ).toMatchObject({ batchId: 'b-new', tapId: 't-new', name: 'Keg' })
+    expect(
+      mapVesselPayload(
+        {
+          id: 'v-old',
+          batchId: 'b-old',
+          tapId: 't-old',
+          vesselNumber: null,
+          vesselType: 'keg',
+          name: 'Keg',
+          fillDate: '2026-01-01',
+          totalVolume: 19,
+          volumeRemaining: 4,
+          bottleVolume: null,
+          bottleCount: null,
+          bottlesRemaining: null,
+          status: 'clean',
+          location: 'Cellar',
+          notes: '',
+          pourEvents: []
+        },
+        new Map([['b-old', 'b-new']]),
+        new Map([['t-old', 't-new']])
+      )
+    ).toMatchObject({ batchId: null, tapId: null, volumeRemaining: 0, bottlesRemaining: 0 })
     expect(mapPourEvent({
       id: 'pour-old',
       vesselId: 'v-old',

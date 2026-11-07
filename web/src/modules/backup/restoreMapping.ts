@@ -8,6 +8,7 @@ import type { ExportDocument } from './exportDocument'
 import type { BrewGraphTapRecord, BrewGraphVesselRecord } from './types'
 import type { DeviceAssignment } from './restoreTypes'
 import { fillFormulaFromConfig } from './deviceConfigFormula'
+import { VESSEL_STATUS_CLEAN } from '@/core/settings/formats'
 
 export function mapDevicePayload(device: ExportDocument['devices'][number]): {
   payload: Record<string, unknown>
@@ -94,18 +95,21 @@ export function mapVesselPayload(
   batchIdMap: Map<string, string>,
   tapIdMap: Map<string, string>
 ): Record<string, unknown> {
+  // A clean vessel is empty and unassigned; a backup that still carries a batch, tap or
+  // contents on one is restored without them.
+  const clean = vessel.status === VESSEL_STATUS_CLEAN
   return {
-    batchId: vessel.batchId ? (batchIdMap.get(vessel.batchId) ?? null) : null,
-    tapId: vessel.tapId ? (tapIdMap.get(vessel.tapId) ?? null) : null,
+    batchId: !clean && vessel.batchId ? (batchIdMap.get(vessel.batchId) ?? null) : null,
+    tapId: !clean && vessel.tapId ? (tapIdMap.get(vessel.tapId) ?? null) : null,
     vesselNumber: vessel.vesselNumber ?? null,
     vesselType: vessel.vesselType,
     name: vessel.name,
     fillDate: vessel.fillDate,
     totalVolume: vessel.totalVolume,
-    volumeRemaining: vessel.volumeRemaining,
+    volumeRemaining: clean ? 0 : vessel.volumeRemaining,
     bottleVolume: vessel.bottleVolume,
     bottleCount: vessel.bottleCount,
-    bottlesRemaining: vessel.bottlesRemaining,
+    bottlesRemaining: clean ? 0 : vessel.bottlesRemaining,
     status: vessel.status,
     location: vessel.location,
     notes: vessel.notes

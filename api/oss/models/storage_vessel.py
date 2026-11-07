@@ -49,8 +49,9 @@ class StorageVessel(Base):
 
     id = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = mapped_column(Uuid(as_uuid=True), nullable=False, default=DEFAULT_TENANT_ID)
-    # Nullable: releasing a keg clears the batch and sets status CLEAN — the only path that
-    # reaches VesselStatus.CLEAN, and the reason an empty clean keg can exist as a row.
+    # Nullable: a vessel with status CLEAN has no batch, no tap and nothing remaining. The
+    # service enforces that whenever a vessel becomes clean, by clearing the batch or by
+    # asking for the status; an empty vessel that was drained by pouring keeps its batch.
     batch_id = mapped_column(
         Uuid(as_uuid=True), ForeignKey("batch.id"), nullable=True, default=None
     )

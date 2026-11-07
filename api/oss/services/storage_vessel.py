@@ -45,6 +45,11 @@ class StorageVesselService(BaseService[StorageVessel, StorageVesselCreate, Stora
         linked, or which of the two the user happened to click would decide whether the
         batch ever left `fermenting`.
         """
+        if obj.status == VesselStatus.CLEAN:
+            self._reject_clean_links(obj.batch_id, obj.tap_id)
+            # A clean vessel is empty, whatever level the payload carried.
+            obj.volume_remaining = 0.0
+            obj.bottles_remaining = 0
         if obj.batch_id is not None:
             self._reject_archived_batch(obj.batch_id)
         if obj.tap_id is not None:
@@ -64,6 +69,14 @@ class StorageVesselService(BaseService[StorageVessel, StorageVesselCreate, Stora
                 raise
         self.commit()
         return vessel
+
+    @staticmethod
+    def _reject_clean_links(batch_id, tap_id) -> None:
+        """A clean vessel is empty and unassigned, so one request cannot also link it."""
+        if batch_id is not None:
+            raise HTTPException(status_code=422, detail="a clean vessel has no batch")
+        if tap_id is not None:
+            raise HTTPException(status_code=422, detail="a clean vessel has no tap")
 
     def _reject_archived_batch(self, batch_id) -> None:
         """An archived batch is read-only and done fermenting/packaging — it cannot
@@ -201,6 +214,37 @@ class StorageVesselService(BaseService[StorageVessel, StorageVesselCreate, Stora
             raise e
         return True
 
+    @staticmethod
+    def _settle_status(vessel: StorageVessel, fields: dict) -> None:
+        """Leave the vessel in a state where `clean` still means empty and unassigned.
+
+        `clean` means "empty and unassigned" — nothing observes whether the keg was
+        actually washed; that is the keg-hygiene reminder's concern. It is reached by
+        clearing the batch, or by asking for it, and either way the batch, tap and
+        remaining figures go with it: stale ones from the last fill would otherwise
+        persist and read as still-full stock. A clean vessel that is then given a
+        batch, a tap or contents is no longer clean and takes the `filled` status a
+        new vessel takes. An explicit status in the request wins over those defaults;
+        `update()` has already refused `clean` together with a batch or a tap.
+        """
+        emptied = "batch_id" in fields and fields["batch_id"] is None
+        if "status" not in fields:
+            if emptied:
+                vessel.status = VesselStatus.CLEAN
+            elif vessel.status == VesselStatus.CLEAN and (
+                fields.get("batch_id") is not None
+                or fields.get("tap_id") is not None
+                or (fields.get("volume_remaining") or 0) > 0
+                or (fields.get("bottles_remaining") or 0) > 0
+            ):
+                vessel.status = VesselStatus.FILLED
+        if emptied or vessel.status == VesselStatus.CLEAN:
+            vessel.volume_remaining = 0.0
+            vessel.bottles_remaining = 0
+        if vessel.status == VesselStatus.CLEAN:
+            vessel.batch_id = None
+            vessel.tap_id = None
+
     def update(self, item_id: Any, obj: StorageVesselUpdate) -> Optional[StorageVessel]:
         """Update a vessel, including its batch and tap links.
 
@@ -218,6 +262,9 @@ class StorageVesselService(BaseService[StorageVessel, StorageVesselCreate, Stora
             return None
 
         fields = obj.model_dump(exclude_unset=True)
+
+        if fields.get("status") == VesselStatus.CLEAN:
+            self._reject_clean_links(fields.get("batch_id"), fields.get("tap_id"))
 
         if fields.get("batch_id") is not None:
             self._reject_archived_batch(fields["batch_id"])
@@ -245,21 +292,12 @@ class StorageVesselService(BaseService[StorageVessel, StorageVesselCreate, Stora
         for column, value in fields.items():
             setattr(vessel, column, value)
 
-        if "batch_id" in fields:
-            if fields["batch_id"] is None:
-                # `clean` here means "empty and unassigned" — nothing observes whether the
-                # keg was actually washed; that is the keg-hygiene reminder's concern. An
-                # explicit status in the same request wins over this default.
-                if "status" not in fields:
-                    vessel.status = VesselStatus.CLEAN
-                # An emptied vessel holds nothing -- stale remaining figures from its
-                # last fill would otherwise persist and read as still-full stock.
-                vessel.volume_remaining = 0.0
-                vessel.bottles_remaining = 0
-            else:
-                # Filling a cellar vessel from a batch *is* packaging it. Idempotent and
-                # fermenting-only, so a second keg changes nothing.
-                BatchService(self.db_session).mark_packaged(fields["batch_id"], vessel.fill_date)
+        self._settle_status(vessel, fields)
+
+        if fields.get("batch_id") is not None:
+            # Filling a cellar vessel from a batch *is* packaging it. Idempotent and
+            # fermenting-only, so a second keg changes nothing.
+            BatchService(self.db_session).mark_packaged(fields["batch_id"], vessel.fill_date)
 
         self.commit()
         return vessel

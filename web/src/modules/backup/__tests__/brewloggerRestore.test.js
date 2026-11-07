@@ -581,10 +581,20 @@ describe('mapBrewLoggerBatchToVessel', () => {
     expect(result.status).toBe('serving')
   })
 
-  it('sets status to clean when volumeRemaining is 0', () => {
+  it('keeps a keg that ran dry serving with its batch, never clean', () => {
     const pour = [makePour({ volume: 0 })]
     const result = mapBrewLoggerBatchToVessel(makeBatch({ pour }))
-    expect(result.status).toBe('clean')
+    expect(result.status).toBe('serving')
+    expect(result.batchId).not.toBeNull()
+    expect(result.volumeRemaining).toBe(0)
+  })
+
+  it('names every imported vessel exactly "Keg", whatever the batch is called', () => {
+    const pour = [makePour()]
+    const a = mapBrewLoggerBatchToVessel(makeBatch({ id: 1, name: 'Pale Ale', pour }))
+    const b = mapBrewLoggerBatchToVessel(makeBatch({ id: 2, name: 'Stout', pour }))
+    const c = mapBrewLoggerBatchToVessel(makeBatch({ id: 3, name: undefined, pour }))
+    expect([a.name, b.name, c.name]).toEqual(['Keg', 'Keg', 'Keg'])
   })
 
   it('sorts pours chronologically', () => {

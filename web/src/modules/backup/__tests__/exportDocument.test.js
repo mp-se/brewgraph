@@ -224,7 +224,7 @@ describe('ml and archive modes withhold identity and credentials', () => {
 
 describe('buildBatchEntry — losslessness', () => {
   it('carries every reading field, not just the ones charts use', () => {
-    // Hosted archives through this format and then deletes, so a dropped field
+    // Archives are exported through this format and then deleted, so a dropped field
     // is destroyed rather than merely absent.
     const entry = buildBatchEntry(batch(), new Map([['dev-1', 'a1b2c3']]))
     const reading = entry.gravityReadings[0]

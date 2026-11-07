@@ -327,6 +327,12 @@
                 <q-icon name="cancel" /> Cancel
               </app-button>
             </router-link>
+            <EmptyVesselButton
+              v-if="!isNew()"
+              :vessel="vessel"
+              :disabled="global.disabled"
+              @emptied="onEmptied"
+            />
           </div>
         </div>
       </form>
@@ -356,6 +362,7 @@ import {
   VESSEL_TYPE_BOTTLE
 } from '@/modules/classes'
 import AppPageHeader from '@/components/AppPageHeader.vue'
+import EmptyVesselButton from '@/components/EmptyVesselButton.vue'
 import DeviceColorSwatch from '@/components/DeviceColorSwatch.vue'
 import DeviceSetupFragment from '@/fragments/DeviceSetupFragment.vue'
 import { useDeviceOptions } from '@/modules/useDeviceOptions'
@@ -604,6 +611,12 @@ const save = async () => {
   } finally {
     isSaving.value = false
   }
+}
+
+function onEmptied(result) {
+  vessel.value = result
+  vesselSaved.value = StorageVessel.fromJson(result.toJson())
+  global.messageSuccess = 'Vessel emptied'
 }
 
 async function recordPour() {

@@ -155,6 +155,22 @@ describe('StorageVessel - Data Class', () => {
       })
       expect(v.toJson().vesselNumber).toBe(5)
     })
+
+    it('serializes a clean vessel without a batch or tap', () => {
+      const v = new StorageVessel({
+        batchId: 'b1',
+        tapId: 't1',
+        vesselType: 'keg',
+        name: 'K1',
+        totalVolume: 19.0,
+        volumeRemaining: 10.0,
+        bottlesRemaining: 2,
+        status: 'clean'
+      })
+      const json = v.toJson()
+      expect(json.batchId).toBeNull()
+      expect(json.tapId).toBeNull()
+    })
   })
 
   describe('setters', () => {
