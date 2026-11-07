@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
     // made a page at /public/<anything> request /public/assets/*.js, which the SPA
     // fallback answers with index.html, so the page stayed blank.
     base: '/',
+    // The web app emits /assets/ too and owns that prefix in the shared proxy, so the
+    // display's bundles live under their own prefix, routed to the display container.
+    build: { assetsDir: 'display-assets' },
     plugins: [vue()],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     server: {
